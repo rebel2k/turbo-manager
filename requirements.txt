@@ -1,0 +1,7 @@
+streamlit
+requests
+urllib3
+os
+logging
+configparser
+re
