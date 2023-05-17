@@ -35,7 +35,7 @@ with st.container():
     with st.container():
         col_new, col_update, col_delete = st.columns(3)
     add_button = col_new.button("Add", use_container_width=True)
-    if len(instance_list) != 0:
+    if len(instance_list) != 0 and instance != st.session_state.instancename:
         update_button = col_update.button("Update", use_container_width=True)
         delete_button = col_delete.button("Delete", use_container_width=True)
     else:
