@@ -27,17 +27,43 @@ st.markdown(
     """
 )
 
+def set_connection_info(instance, turboserver, username, password):
+    st.session_state.instancename = instance
+    st.session_state.turboserver = turboserver
+    st.session_state.username = username
+    st.session_state.password = password
+
+def reset_connection_info():
+    st.session_state.instancename = "n/a"
+    st.session_state.turboserver = "n/a"
+    st.session_state.username = "n/a"
+    st.session_state.password = "n/a"
+
+def set_authtoken(username, password, turboserver):
+    authstatus, authtoken = authenticate_user(username, password, turboserver)
+    if authstatus == 0:
+        st.session_state.authtoken = authtoken
+    else:
+        st.session_state.authtoken = "n/a"
+
+def reset_authtoken():
+    st.session_state.authtoken = "n/a"
+
+def reset_session():
+    reset_connection_info()
+    reset_authtoken()
+    
 with st.container():
     instance_list = get_instance_from_config()
     with st.container():
         st.title("Existing instances")
         col_left, col_right = st.columns(2)
-        instance = col_left.selectbox("Chose an instance", instance_list.keys())
+        instance = col_left.selectbox("Chose an instance", instance_list.keys(), disabled=True if st.session_state.authtoken != "n/a" else False)
         turboserver = instance_list[instance]["address"]
         username = instance_list[instance]["username"]
         password = instance_list[instance]["password"]
         col_right.info("Address: "+turboserver+"  \n"+"Username: "+username)
-        login_button = st.button("Login")
+        login_button = st.button("Login", disabled=True if st.session_state.authtoken != "n/a" else False, on_click=set_authtoken, args=(username, password, turboserver))
     if login_button:
         authstatus, authtoken = authenticate_user(username, password, turboserver)
         if (authstatus == 0):
@@ -55,11 +81,7 @@ with st.container():
             with st.container():
                 #st.title("Results")
                 st.error("Login failed on instance "+instance)
-                st.session_state.instancename = "n/a"
-                st.session_state.turboserver = "n/a"
-                st.session_state.username = "n/a"
-                st.session_state.password = "n/a"
-                st.session_state.authtoken = "n/a"
+                reset_authtoken()
 
 # container1 = st.container()
 # container1.title("Currently logged on")
@@ -78,3 +100,8 @@ st.sidebar.write(st.session_state['instancename'])
 st.sidebar.write(st.session_state['turboserver'])
 st.sidebar.write(st.session_state['username'])
 st.sidebar.write(st.session_state['authtoken'])
+logout_button = st.sidebar.button("Logout", disabled=False if st.session_state.authtoken != "n/a" else True, on_click=reset_session)
+
+if logout_button:
+    reset_session()
+    
