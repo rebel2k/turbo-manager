@@ -81,18 +81,20 @@ with st.container():
                 st.success("Logged in")
                 set_connection_info(instance, turboserver, username, password)
                 set_authtoken(username, password, turboserver)
-                response = get_request(turboserver, authtoken, "admin/versions")
-                if (response):
+                response, status, message = get_request(turboserver, authtoken, "admin/versions")
+                if (status == 0):
                     st.success("Communication/REST API calls successful.")
                     set_turboversion(response["versionInfo"].split('\n')[0])
                 else:
                     st.error("Communication/REST API calls successful failed!")
+                    st.error(message)
                     set_turboversion("n/a")
         else:
             with st.container():
                 #st.title("Results")
                 st.error("Login failed on instance "+instance)
                 reset_authtoken()
+                reset_turboversion()
 
 # container1 = st.container()
 # container1.title("Currently logged on")

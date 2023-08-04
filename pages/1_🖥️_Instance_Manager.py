@@ -1,12 +1,5 @@
-import os
-import logging
-import configparser
 from functions import authenticate_user, get_request, get_instance_from_config, delete_instance_from_config, add_instance_in_config, update_instance_in_config
 import streamlit as st
-
-# Initiate logging
-logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
-log = logging.getLogger(__name__)
 
 # Streamlit initialization
 st.set_page_config(
