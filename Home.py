@@ -18,6 +18,8 @@ if 'password' not in st.session_state:
     st.session_state['password'] = "n/a"
 if 'authtoken' not in st.session_state:
     st.session_state['authtoken'] = "n/a"
+if 'turboversion' not in st.session_state:
+    st.session_state['turboversion'] = "n/a"
 
 st.write("# Welcome to Turbonomic Topology Tool! 👋")
 
@@ -49,9 +51,16 @@ def set_authtoken(username, password, turboserver):
 def reset_authtoken():
     st.session_state.authtoken = "n/a"
 
+def set_turboversion(version):
+    st.session_state.turboversion = version
+
+def reset_turboversion():
+    st.session_state.turboversion = "n/a"
+
 def reset_session():
     reset_connection_info()
     reset_authtoken()
+    reset_turboversion()
     
 with st.container():
     instance_list = get_instance_from_config()
@@ -70,13 +79,15 @@ with st.container():
             with st.container():
                 #st.title("Results")
                 st.success("Logged in")
-                st.session_state.instancename = instance
-                st.session_state.turboserver = turboserver
-                st.session_state.username = username
-                st.session_state.password = password
-                st.session_state.authtoken = authtoken
+                set_connection_info(instance, turboserver, username, password)
+                set_authtoken(username, password, turboserver)
                 response = get_request(turboserver, authtoken, "admin/versions")
-                st.info(response)
+                if (response):
+                    st.success("Communication/REST API calls successful.")
+                    set_turboversion(response["versionInfo"].split('\n')[0])
+                else:
+                    st.error("Communication/REST API calls successful failed!")
+                    set_turboversion("n/a")
         else:
             with st.container():
                 #st.title("Results")
@@ -96,10 +107,11 @@ with st.container():
 
 st.sidebar.title("Connected Server Info")
 st.sidebar.write()
-st.sidebar.write(st.session_state['instancename'])
-st.sidebar.write(st.session_state['turboserver'])
-st.sidebar.write(st.session_state['username'])
-st.sidebar.write(st.session_state['authtoken'])
+st.sidebar.write("Instance Name: " + st.session_state['instancename'])
+st.sidebar.write("URL: " + st.session_state['turboserver'])
+st.sidebar.write("Username: " + st.session_state['username'])
+st.sidebar.write("API Token: " + st.session_state['authtoken'])
+st.sidebar.write("Version: " + st.session_state['turboversion'])
 logout_button = st.sidebar.button("Logout", disabled=False if st.session_state.authtoken != "n/a" else True, on_click=reset_session)
 
 if logout_button:

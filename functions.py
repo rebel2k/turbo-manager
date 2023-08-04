@@ -101,14 +101,14 @@ def authenticate_user(username, password, turboserver):
 
 # Run a GET Rest command and returns the resulting payload in json format
 def get_request(turboserver, authtoken, endpoint):
-    # Get VCPU stats of the selected VM and store them
-    stats_list = []
+    json_response = "n/a"
     headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'cookie': authtoken}
     url = turboserver+api_path+endpoint
-    r = requests.get(url, headers = headers, verify=False)
-    # print("Payload: "+str(payload))
-    # print("Status code: "+str(r.status_code))
-    # print("Content: "+r.text)
-    json_stats = r.json()
-    #print(stats_list)
-    return json_stats
+    try:
+        r = requests.get(url, headers = headers, verify=False)
+        if (r.status_code == 200):
+            json_response = r.json()
+    except requests.exceptions.RequestException as e:
+        error_status = 1
+        error_message = "GET request failed!"
+    return json_response
