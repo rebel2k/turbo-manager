@@ -3,17 +3,13 @@ import json
 import os
 import math
 import subprocess
-from tabulate import tabulate
 import csv
 import yaml
-from collections import Counter
 import threading, queue
-from getpass import getpass
 import urllib3
 import scp 
 import sys
 from os import walk
-from simple_term_menu import TerminalMenu
 import re
 import time
 import kubernetes
@@ -36,13 +32,13 @@ def handle_request(type, url, cookie, data=None):
     session.mount('https://', adapter)
     response = None
     if type == "GET":
-        response = session.get(url, cookies=cookie, verify=False)
+        response = session.get(url, headers= {'Content-type': 'application/json', 'cookie': cookie}, verify=False)
     elif type == "POST":
-        response = session.post(url, cookies=cookie, verify=False, headers= {'Content-type': 'application/json'}, data=data)
+        response = session.post(url,  verify=False, headers= {'Content-type': 'application/json', 'cookie': cookie}, data=data)
     elif type == "PUT":
-        response = session.put(url, cookies=cookie, verify=False, headers= {'Content-type': 'application/json'}, data=data)
+        response = session.put(url,verify=False, headers= {'Content-type': 'application/json', 'cookie': cookie}, data=data)
     elif type == "DELETE":
-        response = session.delete(url, cookies=cookie, verify=False)
+        response = session.delete(url, headers= {'Content-type': 'application/json', 'cookie': cookie}, verify=False)
     if response.status_code != 200:#
         print("Issue with request to "+url+ "Status Code: "+str(response.status_code))
     try:
@@ -305,79 +301,8 @@ def progress(filename, size, sent):
     sys.stdout.write("%s's progress: %.2f%%   \r" % (filename, float(sent)/float(size)*100) )
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-def authenticate():
-    options = get_files_in_folder("known-instances")
-    credentials = {
-        "url" : "n/a",
-        "ssh-url": "n/a",
-        "user": "n/a",
-        "password": "n/a",
-        "ssh-pw": "n/a"
-    }
-    options.append("ROKS")
-    from_file = False
-    options.append("custom")
-    terminal_menu = TerminalMenu(options, title="Please select a Turbo Instance")
-    menu_entry_index = terminal_menu.show()
-    if options[menu_entry_index] == "custom":
-        credentials["url"] = str(input("Enter target Turbo instance (IP or URL): ") or DEFAULT_URL).replace("https://", "").replace("http://","").rstrip('\\')
-        credentials["ssh-url"] = credentials["url"]
-        credentials["user"] = str(input( "Enter Username: ") or DEFAULT_USER)
-        credentials["password"] = str(getpass(prompt="Web UI PW")  or DEFAULT_PW)
-        credentials["ssh-pw"] = str(getpass(prompt="SSH PW for User 'turbo")  or DEFAULT_PW)
-        credentials["kubeconfig"] = ""
-    elif options[menu_entry_index] ==  "ROKS":
-        credentials["url"] = str(input("Enter target Turbo instance (IP or URL): ") or DEFAULT_URL).replace("https://", "").replace("http://","").rstrip('\\')
-        credentials["user"] = str(input( "Enter Username: ") or DEFAULT_USER)
-        credentials["password"] = str(getpass(prompt="Web UI PW")  or DEFAULT_PW)
-        credentials["kubeconfig"] = str(input("Location of kubeconfig file (leave empty if already loaded): ") or "Default")
-    else:
-        with open("known-instances/"+options[menu_entry_index]+'.json') as f:
-                    credentials = json.load(f)
-                    if not credentials.get("kubeconfig", ""):
-                        credentials["kubeconfig"] = ""
-                    from_file = True
-    if not from_file:
-        save = str(input("Save these to a file named "+credentials["url"]+".json ? [y/n]"))
-        if save == "y":
-            with open("known-instances/"+credentials["url"]+".json", "w") as outfile:
-                outfile.write(json.dumps(credentials, indent=4))
-        else:
-            print("Not saving instance")
-    cookie = get_authentication_cookie(credentials)
-    case_data = {
-    "cookie": cookie,
-    "url": "https://"+credentials["url"]+"/",
-    "scope": "n/a",
-    "entity_type": "n/a",
-    "ssh-pw": credentials.get("ssh-pw", "n/a"),
-    "ssh-url": credentials["url"].replace("https://","").replace("/", "")
-}
-    case_data["kubeconfig"] = credentials.get("kubeconfig", "")
-    return case_data
 THREAD_COUNT = 50
 previous = int(0)
-def prompt_topology():
-    options = get_folders_in_folder("known-topologies")
-    options.append("Custom Zip File")
-    terminal_menu = TerminalMenu(options, title= "Select one of the known topologies: ")
-    menu_entry_index = terminal_menu.show()
-    filename = ""
-    if options[menu_entry_index] == "Custom Zip File":
-        while True:
-            filename = input("Please enter path and filename of the custom File: ")
-            if os.path.isfile(filename) and ".zip" in filename:
-                name = input("Please enter a desired Topology Name: ")
-                print("Unzipping "+filename+" to ./known-topologies/"+name)
-                with zipfile.ZipFile(filename, 'r') as zip_ref:
-                    zip_ref.extractall("known-topologies/"+name)
-                filename = name
-                break
-            else:
-                print("Please enter a real File.")
-    else:
-        filename = options[menu_entry_index]
-    return filename
 def get_folders_in_folder(path):
     res = [f.name for f in os.scandir(path) if f.is_dir()]
     return res
@@ -455,27 +380,6 @@ def search_by_filter(case_data, entity):
             ret.append({"Name": entry["displayName"], "UUID": entry["uuid"]})
 
     return ret
-def get_group_by_name(case_data, name):
-    while True:
-        answer, headers = handle_request("GET",case_data["url"]+"api/v3/groups", case_data["cookie"])
-        possibleScopes = []
-        for entry in answer:
-            if name in entry["displayName"]:
-                possibleScopes.append({"scope": entry["uuid"], "Name": entry["displayName"]})
-        if len(possibleScopes) > 1:
-            print("Please specify more detailed Group name. Found: ")
-            options= []
-            for entry in possibleScopes:
-                options.append(entry["Name"])
-            terminal_menu = TerminalMenu(options)
-            menu_entry_index = terminal_menu.show()
-            return possibleScopes[menu_entry_index]["scope"]
-        if len(possibleScopes) == 0:
-            print("Found no Group matching: "+name+" Please try again")
-        else:
-            return possibleScopes[0]["scope"]
-        name = str(input("Group Scope: "))
-
 def get_entity(cookie, url, entry):
     answer, headers= handle_request("GET",url+"api/v3/entities/"+entry,cookie)
     return answer["displayName"]  
@@ -1241,18 +1145,8 @@ def print_to_file_k8s(case_data,entries):
         "MemRequest": {
         "total": totalMemRequest, "invested": investedMemRequest, "saved": savedMemRequest, "change": percentageMemRequest}, "MemLimit": {
         "total": totalMemLimit, "invested": investedMemLimit, "saved": savedMemLimit, "change": percentageMemLimit}}
-        print("Statistics:")
-        print(tabulate([cpuRequest, cpuLimit, memRequest, memLimit], headers=headers))
         
-        appCount = Counter(tok['Application'] for tok in entries)
-        if len(appCount) > 1:
-            headers = ["App Type", "count"]
-            os_list = []
-            for key in appCount:
-                os_list.append([key, str(appCount[key])])
 
-            print("Application Distribution:")
-            print(tabulate(os_list, headers=headers))
         
     return result_values
 def get_cursors(length, threads):

@@ -1,10 +1,8 @@
 import streamlit as st
 from backend_functions import *
+from functions import *
 import paramiko
 import scp 
-from time import sleep
-from functions import *
-from streamlit_extras.switch_page_button import switch_page
 import shutil
 st.set_page_config(
     page_title="Topology Management",
@@ -84,11 +82,7 @@ def get_instance_data():
     }
 
 
-
-if st.session_state.get("instancename", "n/a") == "n/a":
-    st.write("# Please connect to an instance before trying to upload Topologies !")
-    sleep(4)
-    switch_page("Home")
+check_instance_state()
 st.write("# Upload Topologies to Instance")
 prog = st.progress(0, text="Waiting for File")
 topologies = get_folders_in_folder("known-topologies")

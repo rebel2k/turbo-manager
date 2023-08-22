@@ -2,8 +2,7 @@ streamlit
 streamlit-extras
 requests
 urllib3
-os
 logging
 configparser
-re
+kubernetes
 watchdog
