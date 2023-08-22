@@ -6,3 +6,4 @@ logging
 configparser
 kubernetes
 watchdog
+scp
