@@ -20,6 +20,10 @@ if 'authtoken' not in st.session_state:
     st.session_state['authtoken'] = "n/a"
 if 'turboversion' not in st.session_state:
     st.session_state['turboversion'] = "n/a"
+if 'ssh_address' not in st.session_state:
+    st.session_state['ssh_address'] = "n/a"
+if 'ssh_password' not in st.session_state:
+    st.session_state['ssh_password'] = "n/a"
 
 st.write("# Welcome to Turbonomic Topology Tool! 👋")
 
@@ -35,12 +39,12 @@ with st.container():
     with st.container():
         st.title("Existing instances")
         col_left, col_right = st.columns(2)
-        instance = col_left.selectbox("Choose an instance", instance_list.keys(), disabled=True if st.session_state.authtoken != "n/a" else False)
+        instance = col_left.selectbox("Chose an instance", instance_list.keys(), disabled=True if st.session_state.authtoken != "n/a" else False)
         turboserver = instance_list[instance]["address"]
         username = instance_list[instance]["username"]
         password = instance_list[instance]["password"]
         ssh_password = instance_list[instance]["ssh-password"]
-        ssh_url = instance_list[instance]["ssh-url"]
+        ssh_address = instance_list[instance]["ssh-address"]
         col_right.info("Address: "+turboserver+"  \n"+"Username: "+username)
         login_button = st.button("Login", disabled=True if st.session_state.authtoken != "n/a" else False, on_click=set_authtoken, args=(username, password, turboserver))
     if login_button:
@@ -49,7 +53,7 @@ with st.container():
             with st.container():
                 #st.title("Results")
                 st.success("Logged in")
-                set_connection_info(instance, turboserver, username, password, ssh_url=ssh_url, ssh_password=ssh_password)
+                set_connection_info(instance, turboserver, username, password, ssh_address=ssh_address, ssh_password=ssh_password)
                 set_authtoken(username, password, turboserver)
                 response, status, message = get_request(turboserver, authtoken, "admin/versions")
                 if (status == 0):
