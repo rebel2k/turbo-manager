@@ -25,7 +25,7 @@ with st.container():
             username = instance_list[instance]["username"]
             password = instance_list[instance]["password"]
             ssh_password = instance_list[instance]["ssh-password"]
-            ssh_url = instance_list[instance]["ssh-url"]
+            ssh_address = instance_list[instance]["ssh-address"]
             col_right.info("Address: "+turboserver+"  \n"+"Username: "+username)
         else:
             st.info("There is no registered instance yet. You can add one by clicking the \"Add\" button.")
@@ -54,7 +54,7 @@ with st.container():
         st.session_state.instance_manager_password = update_form.text_input('Password', instance_list[instance]["password"], type="password")
         st.session_state.instance_manager_ssh_password = update_form.text_input('SSH-Password', instance_list[instance]["ssh-password"], type="password")
         st.session_state.instance_manager_address = update_form.text_input('Server Address', instance_list[instance]["address"])
-        st.session_state.instance_manager_ssh_address = update_form.text_input('Server Address SSH', instance_list[instance]["ssh-url"])
+        st.session_state.instance_manager_ssh_address = update_form.text_input('Server SSH Address', instance_list[instance]["ssh-address"])
         col_left, col_right = update_form.columns(2)
         if col_left.form_submit_button("Save", use_container_width=True):
             st.session_state.step = "update_save_clicked"
@@ -80,7 +80,7 @@ with st.container():
         st.session_state.instance_manager_password = add_form.text_input('Password', type="password")
         st.session_state.instance_manager_address = add_form.text_input('Server Address', "https://")
         st.session_state.instance_manager_ssh_password = add_form.text_input('SSH Password', type="password")
-        st.session_state.instance_manager_ssh_address = add_form.text_input('Server SSH Address', "IP OR HOSTNAME")
+        st.session_state.instance_manager_ssh_address = add_form.text_input('Server SSH Address', "IP Address or hostname")
         # Every form must have a submit button.
         #submit_add = add_form.form_submit_button("Save", on_click=save_values_in_session_state, args=(name_new, username_new, password_new, address_new))
         col_left, col_right = add_form.columns(2)

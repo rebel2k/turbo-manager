@@ -50,8 +50,8 @@ def add_instance_in_config(name, username, password, address, ssh_password, ssh_
             bool_username_added = config.set(name, 'username', username)
             bool_password_added = config.set(name, 'password', password)
             bool_address_added = config.set(name, 'address', address)
-            bool_ssh_address_added = config.set(name, 'ssh-password', ssh_password)
-            bool_ssh_password_added = config.set(name, 'ssh-url', ssh_address)
+            bool_ssh_password_added = config.set(name, 'ssh-password', ssh_password)
+            bool_ssh_address_added = config.set(name, 'ssh-address', ssh_address)
         except configparser.DuplicateSectionError as eduplicate:
             error_status = 1
             error_message = "Name already exists!"
@@ -146,6 +146,7 @@ def populate_sidebar():
         st.sidebar.write()
         st.sidebar.write("Instance Name: " + st.session_state['instancename'])
         st.sidebar.write("URL: " + st.session_state['turboserver'])
+        st.sidebar.write("SSH Address: " + st.session_state['ssh_address'])
         st.sidebar.write("Username: " + st.session_state['username'])
         st.sidebar.write("API Token: " + st.session_state['authtoken'])
         st.sidebar.write("Version: " + st.session_state['turboversion'])
@@ -154,19 +155,21 @@ def populate_sidebar():
         if logout_button:
             reset_session()
     
-def set_connection_info(instance, turboserver, username, password, ssh_password, ssh_url):
+def set_connection_info(instance, turboserver, username, password, ssh_password, ssh_address):
     st.session_state.instancename = instance
     st.session_state.turboserver = turboserver
     st.session_state.username = username
     st.session_state.password = password
     st.session_state.ssh_password = ssh_password
-    st.session_state.ssh_url = ssh_url
+    st.session_state.ssh_address = ssh_address
 
 def reset_connection_info():
     st.session_state.instancename = "n/a"
     st.session_state.turboserver = "n/a"
     st.session_state.username = "n/a"
     st.session_state.password = "n/a"
+    st.session_state.ssh_password = "n/a"
+    st.session_state.ssh_address = "n/a"
 
 def set_authtoken(username, password, turboserver):
     authstatus, authtoken = authenticate_user(username, password, turboserver)
