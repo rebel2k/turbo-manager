@@ -23,7 +23,7 @@ def get_instance_from_config():
     config.read(config_file)
     sections = config.sections()
     for instance in sections:
-        instances[instance] = {"username": config[instance]['username'], "password": config[instance]['password'], "address": config[instance]['address'], "ssh-url": config[instance]['ssh-url'], "ssh-password":config[instance]['ssh-password']}
+        instances[instance] = {"username": config[instance]['username'], "password": config[instance]['password'], "address": config[instance]['address'], "ssh-address": config[instance]['ssh-address'], "ssh-password":config[instance]['ssh-password']}
     return instances
 
 # Remove a section given in argument (Turbonomic Instance)
@@ -63,7 +63,7 @@ def add_instance_in_config(name, username, password, address, ssh_password, ssh_
     return error_status, error_message
 
 # Update a section given in argument with the given values (Turbonomic Instance)
-def update_instance_in_config(name, username, password, address):
+def update_instance_in_config(name, username, password, address, ssh_password, ssh_address):
     error_status = 0
     error_message = "OK"
     config = configparser.ConfigParser()
@@ -74,6 +74,8 @@ def update_instance_in_config(name, username, password, address):
             bool_username_updated = config.set(name, 'username', username)
             bool_password_updated = config.set(name, 'password', password)
             bool_address_updated = config.set(name, 'address', address)
+            bool_ssh_password_updated = config.set(name, 'ssh-password', ssh_password)
+            bool_ssh_address_updated = config.set(name, 'ssh-address', ssh_address)
         except configparser.NoSectionError as eduplicate:
             error_status = 1
             error_message = "Section doesn't exist!"
@@ -136,12 +138,7 @@ def post_request(turboserver, authtoken, endpoint, payload):
         error_message = "POST request failed!"
     return json_response, error_status, error_message
 
-
 def populate_sidebar():
-    if st.session_state.get("instancename", "") == "":
-        print("Switching Page")
-        switch_page("Home")
-    else:
         st.sidebar.title("Connected Server Info")
         st.sidebar.write()
         st.sidebar.write("Instance Name: " + st.session_state['instancename'])
