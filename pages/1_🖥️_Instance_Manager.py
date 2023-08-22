@@ -20,7 +20,6 @@ with st.container():
         col_left, col_right = st.columns(2)
         if len(instance_list) != 0:
             instance = col_left.selectbox("Chose an instance", instance_list.keys())
-            st.session_state.instance = instance
             turboserver = instance_list[instance]["address"]
             username = instance_list[instance]["username"]
             password = instance_list[instance]["password"]
@@ -32,7 +31,7 @@ with st.container():
     with st.container():
         col_new, col_update, col_delete = st.columns(3)
     add_button = col_new.button("Add", use_container_width=True)
-    if len(instance_list) != 0 and instance != st.session_state.instance:
+    if len(instance_list) != 0 and instance != st.session_state.instancename:
         update_button = col_update.button("Update", use_container_width=True)
         delete_button = col_delete.button("Delete", use_container_width=True)
     else:
