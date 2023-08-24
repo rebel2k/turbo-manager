@@ -1,0 +1,4 @@
+[server]
+port = 80
+# 5GB Max Upload size (for large Diags)
+maxUploadSize = 5000 
