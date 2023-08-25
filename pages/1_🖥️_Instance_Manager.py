@@ -19,7 +19,7 @@ with st.container():
         st.title("Registered instances")
         col_left, col_right = st.columns(2)
         if len(instance_list) != 0:
-            instance = col_left.selectbox("Chose an instance", instance_list.keys())
+            instance = col_left.selectbox("Chose an instance", instance_list.keys(), on_change=reset_step)
             turboserver = instance_list[instance]["address"]
             username = instance_list[instance]["username"]
             password = instance_list[instance]["password"]
