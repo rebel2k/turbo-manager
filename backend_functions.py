@@ -954,13 +954,13 @@ def get_policy_parameter(policies, managerName, entity, settingName):
     return "Not Found"
 def set_policies(case_data,policies):
     count = 0
-    for entry in policies: 
-        progress_bar(count, len(policies))
+    for entry in policies:  
         if entry["readOnly"] == True:
-            print("Skipping policy "+entry["displayName"]+" because it is read only.")
             continue
         uuid = entry["uuid"]
         answer, headers = handle_request("PUT",case_data["url"]+"api/v3/settingspolicies/"+uuid, case_data["cookie"],  data=json.dumps(entry))
+        if "Container" in entry["displayName"] :
+            print(str(answer))
         count += 1
     return True
 def get_market_data(case_data, uuid):
@@ -1032,6 +1032,7 @@ def set_policy_parameter(policies,entity,manager_name, name, value):
     managerCount = 0
     settingsCount = 0
     entityCount = 0
+    print("Handling: "+str(entity)+"manager_name:"+ manager_name+" name: "+name+" Value:"+str(value))
     for entry in policies: 
         if entry["entityType"] == entity and entry["default"] == True: #VM etc. 
             for manager in entry["settingsManagers"]:
@@ -1039,9 +1040,10 @@ def set_policy_parameter(policies,entity,manager_name, name, value):
                     for setting in manager["settings"]:
                         if setting["displayName"] == name:
                             policies[entityCount]["settingsManagers"][managerCount]["settings"][settingsCount]["value"] = value
+                            print("Found: "+str(setting))
                             return True
                         settingsCount += 1
-            managerCount += 1
+                managerCount += 1
         entityCount += 1
     return False
 def get_active_policies(case_data, group_uuid, entity=False):
