@@ -6,6 +6,7 @@ import os
 from streamlit_extras.switch_page_button import switch_page
 import re
 import streamlit as st
+import time
 urllib3.disable_warnings()
 
 # Global configuration
@@ -26,6 +27,12 @@ def get_instance_from_config():
         instances[instance] = {"username": config[instance]['username'], "password": config[instance]['password'], "address": config[instance]['address'], "ssh-address": config[instance]['ssh-address'], "ssh-password":config[instance]['ssh-password']}
     return instances
 
+def check_instance_state():
+    
+    if st.session_state.get("instancename", "n/a") == "n/a":
+        st.write("# Please connect to an instance before trying to upload Topologies !")
+        time.sleep(2)
+        switch_page("Home")
 # Remove a section given in argument (Turbonomic Instance)
 def delete_instance_from_config(section):
     instances = get_instance_from_config()
@@ -139,18 +146,22 @@ def post_request(turboserver, authtoken, endpoint, payload):
     return json_response, error_status, error_message
 
 def populate_sidebar():
+        
         st.sidebar.title("Connected Server Info")
         st.sidebar.write()
-        st.sidebar.write("Instance Name: " + st.session_state['instancename'])
-        st.sidebar.write("URL: " + st.session_state['turboserver'])
-        st.sidebar.write("SSH Address: " + st.session_state['ssh_address'])
-        st.sidebar.write("Username: " + st.session_state['username'])
-        st.sidebar.write("API Token: " + st.session_state['authtoken'])
-        st.sidebar.write("Version: " + st.session_state['turboversion'])
-        logout_button = st.sidebar.button("Logout", disabled=False if st.session_state.authtoken != "n/a" else True, on_click=reset_session)
+        if st.session_state.get('instancename','') == "":
+            st.sidebar.write("No Instance connected")
+        else:
+            st.sidebar.write("Instance Name: " + st.session_state['instancename'])
+            st.sidebar.write("URL: " + st.session_state['turboserver'])
+            st.sidebar.write("SSH Address: " + st.session_state['ssh_address'])
+            st.sidebar.write("Username: " + st.session_state['username'])
+            st.sidebar.write("API Token: " + st.session_state['authtoken'])
+            st.sidebar.write("Version: " + st.session_state['turboversion'])
+            logout_button = st.sidebar.button("Logout", disabled=False if st.session_state.authtoken != "n/a" else True, on_click=reset_session)
 
-        if logout_button:
-            reset_session()
+            if logout_button:
+                reset_session()
     
 def set_connection_info(instance, turboserver, username, password, ssh_password, ssh_address):
     st.session_state.instancename = instance
