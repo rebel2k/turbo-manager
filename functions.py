@@ -28,11 +28,16 @@ def get_instance_from_config():
     return instances
 
 def check_instance_state():
-    
     if st.session_state.get("instancename", "n/a") == "n/a":
         st.write("# Please connect to an instance before trying to upload Topologies !")
         time.sleep(2)
         switch_page("Home")
+
+# Reset step in session_state
+def reset_step():
+    if 'step' in st.session_state:
+        st.session_state['step'] = "n/a"
+
 # Remove a section given in argument (Turbonomic Instance)
 def delete_instance_from_config(section):
     instances = get_instance_from_config()
