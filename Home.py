@@ -30,7 +30,7 @@ if 'ssh_password' not in st.session_state:
 instance_list = get_instance_from_config()
 if instance_list == {}:
     st.write("Please add an Instance first, forwarding to the Instance Manager now...")
-    time.sleep(1)
+    time.sleep(2)
     switch_page("Instance Manager")
 st.write("# Welcome to Turbonomic Topology Tool! 👋")
 
