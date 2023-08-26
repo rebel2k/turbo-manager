@@ -7,6 +7,7 @@ from streamlit_extras.switch_page_button import switch_page
 import re
 import streamlit as st
 import time
+from io import StringIO
 urllib3.disable_warnings()
 
 # Global configuration
@@ -25,6 +26,9 @@ def get_instance_from_config():
     sections = config.sections()
     for instance in sections:
         instances[instance] = {"username": config[instance]['username'], "password": config[instance]['password'], "address": config[instance]['address'], "ssh-address": config[instance]['ssh-address'], "ssh-password":config[instance]['ssh-password']}
+        if config[instance].get("kubeconfig", "") != "":
+            instances[instance]["kubeconfig"] = config[instance]["kubeconfig"].replace(",","\n")
+            instances[instance]["namespace"] = config[instance]["namespace"]
     return instances
 
 def check_instance_state():
@@ -50,52 +54,64 @@ def delete_instance_from_config(section):
 
 # Add a section given in argument with the given values (Turbonomic Instance)
 # Returns the code (0 if OK) and the message of the error if any ("OK" if no error)
-def add_instance_in_config(name, username, password, address, ssh_password, ssh_address):
+def add_instance_in_config(name, username, password, address, ssh_password, ssh_address, is_k8s):
     error_status = 0
     error_message = "OK"
     config = configparser.ConfigParser()
     config.read(config_file)
-    pattern_address = re.compile("^https\:\/\/([a-zA-Z0-9\.]+|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$")
-    if pattern_address.match(address):
-        try:
-            bool_section_added = config.add_section(name)
-            bool_username_added = config.set(name, 'username', username)
-            bool_password_added = config.set(name, 'password', password)
-            bool_address_added = config.set(name, 'address', address)
-            bool_ssh_password_added = config.set(name, 'ssh-password', ssh_password)
-            bool_ssh_address_added = config.set(name, 'ssh-address', ssh_address)
-        except configparser.DuplicateSectionError as eduplicate:
-            error_status = 1
-            error_message = "Name already exists!"
-        with open(config_file, 'w+') as config_to_update:
-            config.write(config_to_update)
-    else:
-        error_status = 2
-        error_message = "Invalid Turbonomic server address. It should follow the format: \"https://<server_name>\" or \"https://<ip_address>\""
+   # pattern_address = re.compile("^https\:\/\/([a-zA-Z0-9\.]+|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$")
+   # if pattern_address.match(address):
+    try:
+        bool_section_added = config.add_section(name)
+        bool_username_added = config.set(name, 'username', username)
+        bool_password_added = config.set(name, 'password', password)
+        bool_address_added = config.set(name, 'address', address)
+        bool_ssh_password_added = config.set(name, 'ssh-password', ssh_password)
+        bool_ssh_address_added = config.set(name, 'ssh-address', ssh_address)
+        if is_k8s:
+            config.set(name, 'namespace', st.session_state.instance_manager_namespace)
+            stringio = StringIO(st.session_state.instance_manager_kubeconfig.getvalue().decode("utf-8"))
+            kubeconfig_string = stringio.read()
+            config.set(name, 'kubeconfig', kubeconfig_string.replace("\n",","))
+    except configparser.DuplicateSectionError as eduplicate:
+        error_status = 1
+        error_message = "Name already exists!"
+    with open(config_file, 'w+') as config_to_update:
+        config.write(config_to_update)
+# else:
+   #     error_status = 2
+   #     error_message = "Invalid Turbonomic server address. It should follow the format: \"https://<server_name>\" or \"https://<ip_address>\""
     return error_status, error_message
 
 # Update a section given in argument with the given values (Turbonomic Instance)
-def update_instance_in_config(name, username, password, address, ssh_password, ssh_address):
+def update_instance_in_config(name, username, password, address, ssh_password, ssh_address, is_k8s):
     error_status = 0
     error_message = "OK"
     config = configparser.ConfigParser()
     config.read(config_file)
-    pattern_address = re.compile("^https\:\/\/([a-zA-Z0-9\.]+|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$")
-    if pattern_address.match(address):
-        try:
-            bool_username_updated = config.set(name, 'username', username)
-            bool_password_updated = config.set(name, 'password', password)
-            bool_address_updated = config.set(name, 'address', address)
-            bool_ssh_password_updated = config.set(name, 'ssh-password', ssh_password)
-            bool_ssh_address_updated = config.set(name, 'ssh-address', ssh_address)
-        except configparser.NoSectionError as eduplicate:
-            error_status = 1
-            error_message = "Section doesn't exist!"
-        with open(config_file, 'w+') as config_to_update:
-            config.write(config_to_update)
-    else:
-        error_status = 2
-        error_message = "Invalid Turbonomic server address. It should follow the format: \"https://<server_name>\" or \"https://<ip_address>\""
+    #pattern_address = re.compile("^https\:\/\/([a-zA-Z0-9\.]+|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})$") # TODO: Amend this - With techzone etc we are working with subdomains...
+    #if pattern_address.match(address):
+    try:
+        bool_username_updated = config.set(name, 'username', username)
+        bool_password_updated = config.set(name, 'password', password)
+        bool_address_updated = config.set(name, 'address', address)
+        bool_ssh_password_updated = config.set(name, 'ssh-password', ssh_password)
+        bool_ssh_address_updated = config.set(name, 'ssh-address', ssh_address)
+        if is_k8s:
+            config.set(name, 'namespace', st.session_state.instance_manager_namespace)
+            if len(st.session_state.instance_manager_kubeconfig.getvalue()) > 0:
+                stringio = StringIO(st.session_state.instance_manager_kubeconfig.getvalue().decode("utf-8"))
+                kubeconfig_string = stringio.read()
+                config.set(name, 'kubeconfig', kubeconfig_string.replace("\n", ","))
+
+    except configparser.NoSectionError as eduplicate:
+        error_status = 1
+        error_message = "Section doesn't exist!"
+    with open(config_file, 'w+') as config_to_update:
+        config.write(config_to_update)
+   # else:
+   #     error_status = 2
+   #     error_message = "Invalid Turbonomic server address. It should follow the format: \"https://<server_name>\" or \"https://<ip_address>\""
     return error_status, error_message
 
 # Authenticate a user with username and password credentials on the turboserver server
@@ -168,13 +184,15 @@ def populate_sidebar():
             if logout_button:
                 reset_session()
     
-def set_connection_info(instance, turboserver, username, password, ssh_password, ssh_address):
+def set_connection_info(instance, turboserver, username, password, ssh_password, ssh_address, kubeconfig, namespace):
     st.session_state.instancename = instance
     st.session_state.turboserver = turboserver
     st.session_state.username = username
     st.session_state.password = password
     st.session_state.ssh_password = ssh_password
     st.session_state.ssh_address = ssh_address
+    st.session_state.kubeconfig = kubeconfig
+    st.session_state.namespace = namespace
 
 def reset_connection_info():
     st.session_state.instancename = "n/a"
@@ -183,6 +201,8 @@ def reset_connection_info():
     st.session_state.password = "n/a"
     st.session_state.ssh_password = "n/a"
     st.session_state.ssh_address = "n/a"
+    st.session_state.kubeconfig = "n/a"
+    st.session_state.namespace = "n/a"
 
 def set_authtoken(username, password, turboserver):
     authstatus, authtoken = authenticate_user(username, password, turboserver)

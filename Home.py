@@ -51,6 +51,8 @@ with st.container():
             password = instance_list[instance]["password"]
             ssh_password = instance_list[instance]["ssh-password"]
             ssh_address = instance_list[instance]["ssh-address"]
+            kubeconfig = instance_list[instance].get("kubeconfig", "")
+            namespace = instance_list[instance].get("namespace", "turbo")
             col_right.info("Address: "+turboserver+"  \n"+"Username: "+username)
             login_button = st.button("Login", disabled=True if st.session_state.authtoken != "n/a" else False, on_click=set_authtoken, args=(username, password, turboserver))
         if login_button:
@@ -59,7 +61,7 @@ with st.container():
                 with st.container():
                     #st.title("Results")
                     st.success("Logged in")
-                    set_connection_info(instance, turboserver, username, password, ssh_address=ssh_address, ssh_password=ssh_password)
+                    set_connection_info(instance, turboserver, username, password, ssh_address=ssh_address, ssh_password=ssh_password, kubeconfig=kubeconfig, namespace=namespace)
                     set_authtoken(username, password, turboserver)
                     response, status, message = get_request(turboserver, authtoken, "admin/versions")
                     if (status == 0):
