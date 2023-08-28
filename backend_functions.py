@@ -49,13 +49,13 @@ def handle_request(type, url, cookie, data=None):
         return answer, response.headers
     except Exception:
         print("could not extract JSON... text: "+response.text)
-        
-def watch_deployment(client, deployment):
+    
+def watch_deployment(client, deployment, namespace="turbo"):
     w = kubernetes.watch.Watch()
     api_client = kubernetes.client.AppsV1Api()
     count = 0
     while True:
-        resp = api_client.read_namespaced_deployment(name=deployment, namespace="turbo")
+        resp = api_client.read_namespaced_deployment(name=deployment, namespace=namespace)
         if resp.status.replicas == resp.status.ready_replicas:
             print("Done Waiting")
             return
@@ -107,20 +107,20 @@ def copy_file_to_pod(source_file, destination_file, pod_name, namespace="turbo")
     
     cmd = ["kubectl","-n",namespace, "cp", source_file, pod_name+":/"+destination_file]
     p = subprocess.run(cmd)
-def scale_replicas( v1Client, deployment, count):
+def scale_replicas( v1Client, deployment, count, namespace="turbo"):
     api_client = kubernetes.client.AppsV1Api()
-    api_response = api_client.patch_namespaced_deployment_scale( deployment, "turbo", {'spec': {'replicas': int(count)}})
+    api_response = api_client.patch_namespaced_deployment_scale( deployment, namespace, {'spec': {'replicas': int(count)}})
     watch_deployment(v1Client, deployment)
 
 def make_k8s_client(kubeconfig: dict) -> kubernetes.client.CoreV1Api:
     api_client = kubernetes.config.new_client_from_config_dict(kubeconfig)
     return kubernetes.client.CoreV1Api(api_client)
 
-def exec_in_pod(client, podname, cmd):
+def exec_in_pod(client, podname, cmd, namespace="turbo"):
     print("Trying to run in pod: "+podname+": "+str(cmd))
     resp = kubernetes.stream.stream(client.connect_get_namespaced_pod_exec,
                   podname,
-                  'turbo',
+                  namespace,
                   command=cmd,
                   stderr=True, stdin=False,
                   stdout=True, tty=False)
@@ -142,8 +142,8 @@ def get_names(folder):
            "groupfile": get_biggest(folder+"/group*"),
             "rsyslog": get_biggest(folder+'/rsyslog*.zip') }
     return ret
-def purge_topology_cluster(api_client):
-    ret = api_client.list_namespaced_pod("turbo")
+def purge_topology_cluster(api_client, namespace="turbo"):
+    ret = api_client.list_namespaced_pod(namespace)
     to_purge = ["topology-processor", "group", "cost", "market"]
     consul_name = ""
     mysql_name = ""
@@ -152,28 +152,28 @@ def purge_topology_cluster(api_client):
             consul_name = i.metadata.name
         if "db-" in i.metadata.name:
             mysql_name = i.metadata.name
-    scale_replicas(api_client, "t8c-operator", 0)
+    scale_replicas(api_client, "t8c-operator", 0, namespace)
     for entry in to_purge:
-        scale_replicas(api_client, entry, 0)
+        scale_replicas(api_client, entry, 0, namespace)
         # then get the name of the db (which is the same as the pod but - => _). Drop that.
         cmd = ["mysql", "-S","/var/run/mysqld/mysqld.sock", "-u","root" ,"--password=vmturbo", '-e', 'drop database '+entry.replace("-","_")+';']
-        exec_in_pod(api_client, mysql_name, cmd)
+        exec_in_pod(api_client, mysql_name, cmd, namespace)
         # Then clear in Consul:
-        exec_in_pod(api_client, consul_name, ["/bin/consul","kv", "delete", "--recurse",entry])
-        scale_replicas(api_client, entry, 1)
+        exec_in_pod(api_client, consul_name, ["/bin/consul","kv", "delete", "--recurse",entry], namespace)
+        scale_replicas(api_client, entry, 1, namespace)
 
-    scale_replicas(api_client, "t8c-operator", 1)
-def prepare_helper_pod(api_client, filenames):  
-    open_pod(api_client,pod_name="helper")  
-    exec_in_pod(api_client, "helper", ["apk", "add", "tar"])
+    scale_replicas(api_client, "t8c-operator", 1, namespace)
+def prepare_helper_pod(api_client, filenames, namespace="turbo"):  
+    open_pod(api_client,pod_name="helper", namespace=namespace)  
+    exec_in_pod(api_client, "helper", ["apk", "add", "tar"], namespace)
     print(str(filenames))
-    copy_file_to_pod(filenames["groupfile"],"group.zip", "helper")
+    copy_file_to_pod(filenames["groupfile"],"group.zip", "helper", namespace)
     print("Copied groups")
     time.sleep(5)
-    copy_file_to_pod(filenames["topologyfile"], "topology.zip","helper")
+    copy_file_to_pod(filenames["topologyfile"], "topology.zip","helper", namespace)
     print("Copied topology")
 
-    exec_in_pod(api_client, "helper", ["apk", "add", "curl"])
+    exec_in_pod(api_client, "helper", ["apk", "add", "curl"], namespace)
     # Now execute those curl statements:
 def open_pod(      api_client, pod_name: str, 
                    cmd: list=["sleep","60m"],
@@ -232,32 +232,35 @@ def get_service_ip(api_client, service_name, namespace="turbo"):
         if service_name in entry.metadata.name:
             return  entry.spec.cluster_ip
         
-def prepare_upload(api_client, service_name):
-    service_ip = get_service_ip(api_client, service_name)
+def prepare_upload(api_client, service_name, namespace):
+    service_ip = get_service_ip(api_client, service_name, namespace)
     cmd = ["curl", "--header",'Content-Type: application/zip', "--data-binary","@/"+service_name+".zip", "http://"+service_ip+":8080/internal-state" ]
     return cmd
-def load_topology_cluster(configname, topologyname):
+def load_topology_cluster(kubeconfig, topologyname, prog, namespace="turbo"):
     api_client = None
-    if configname == "Default":
-        config.load_kube_config()
-        api_client = kubernetes.client.CoreV1Api()
-    else:
-        with open(configname) as f:
-            kubeconfig = yaml.safe_load(f)
-            api_client = make_k8s_client(kubeconfig)
+    config_dict = yaml.safe_load(kubeconfig)
+    api_client = make_k8s_client(config_dict)
+    prog.progress(value = 20,text ="Loaded Kubeconfig")
     # First Purge old Topology: 
     # Secondly load Group
     # Thirdly load Cost
     #purge_topology_cluster(api_client)
-    prepare_helper_pod(api_client,topologyname)  
-    group_cmd = prepare_upload(api_client, "group")
-    topology_cmd = prepare_upload(api_client, "topology")
-    exec_in_pod(api_client, "helper", group_cmd) 
-    exec_in_pod(api_client, "helper", topology_cmd)
-    system_ip = get_service_ip(api_client, "topology-processor")
+    prepare_helper_pod(api_client,topologyname, namespace)  
+    prog.progress(value = 30,text ="Launched Helper Pod")
+    group_cmd = prepare_upload(api_client, "group", namespace)
+    prog.progress(value = 40,text ="Uploaded Group Data")
+    topology_cmd = prepare_upload(api_client, "topology", namespace)
+    prog.progress(value = 50,text ="Uploaded Topology Data")
+    exec_in_pod(api_client, "helper", group_cmd, namespace) 
+    prog.progress(value = 60,text ="Passed Group Data")
+    exec_in_pod(api_client, "helper", topology_cmd, namespace)
+    prog.progress(value = 70,text ="Passed Topology Data")
+    system_ip = get_service_ip(api_client, "topology-processor", namespace)
     broadcast = ["curl" ,"-X" ,"POST" ,"--header","Content-Type: application/json","--header","Accept: application/json" ,"http://"+system_ip+":8080/topology/send"]
-    exec_in_pod(api_client, "helper", broadcast)
-    api_response = api_client.delete_namespaced_pod("helper", "turbo")
+    exec_in_pod(api_client, "helper", broadcast, namespace)
+    prog.progress(value = 90,text ="Broadcasted")
+    api_response = api_client.delete_namespaced_pod("helper", namespace)
+    prog.progress(value = 100,text ="All Done")
         
 def load_topology(ssh):
     
@@ -954,13 +957,13 @@ def get_policy_parameter(policies, managerName, entity, settingName):
     return "Not Found"
 def set_policies(case_data,policies):
     count = 0
-    for entry in policies: 
-        progress_bar(count, len(policies))
+    for entry in policies:  
         if entry["readOnly"] == True:
-            print("Skipping policy "+entry["displayName"]+" because it is read only.")
             continue
         uuid = entry["uuid"]
         answer, headers = handle_request("PUT",case_data["url"]+"api/v3/settingspolicies/"+uuid, case_data["cookie"],  data=json.dumps(entry))
+        if "Container" in entry["displayName"] :
+            print(str(answer))
         count += 1
     return True
 def get_market_data(case_data, uuid):
@@ -1032,6 +1035,7 @@ def set_policy_parameter(policies,entity,manager_name, name, value):
     managerCount = 0
     settingsCount = 0
     entityCount = 0
+    print("Handling: "+str(entity)+"manager_name:"+ manager_name+" name: "+name+" Value:"+str(value))
     for entry in policies: 
         if entry["entityType"] == entity and entry["default"] == True: #VM etc. 
             for manager in entry["settingsManagers"]:
@@ -1039,9 +1043,10 @@ def set_policy_parameter(policies,entity,manager_name, name, value):
                     for setting in manager["settings"]:
                         if setting["displayName"] == name:
                             policies[entityCount]["settingsManagers"][managerCount]["settings"][settingsCount]["value"] = value
+                            print("Found: "+str(setting))
                             return True
                         settingsCount += 1
-            managerCount += 1
+                managerCount += 1
         entityCount += 1
     return False
 def get_active_policies(case_data, group_uuid, entity=False):

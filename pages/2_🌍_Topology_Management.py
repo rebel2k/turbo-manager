@@ -9,48 +9,59 @@ st.set_page_config(
     page_icon="🌍",
 )
 
-def upload_topology(topology_file, name):
-
+def upload_topology(topology_file, name, instance_data):
+    
     # First step: Unzip the file:
-    with zipfile.ZipFile(topology_file, 'r') as zip_ref:
-        zip_ref.extractall("known-topologies/"+name)
+
+    if topology_file != None:
+        st.write("Extracting to: "+name)
+        with zipfile.ZipFile(topology_file, 'r') as zip_ref:
+            zip_ref.extractall("known-topologies/"+name)
     # Second step
     prog.value = 10
     prog.text = "Extracted file"
-    ssh = createSSHClient(instance_data["ssh-url"], "turbo", instance_data["ssh-pw"])
-    scpClient = scp.SCPClient(ssh.get_transport(), progress=progress)
+    if instance_data["kubeconfig"] == "":
+        ssh = createSSHClient(instance_data["ssh-url"], "turbo", instance_data["ssh-pw"])
+        scpClient = scp.SCPClient(ssh.get_transport(), progress=progress)
 
-    topology_name = get_names("known-topologies/"+name)
-    # and then
-    print("Copying Group File: ")
-    scpClient.put("./"+topology_name["groupfile"], remote_path='/tmp/group.zip')
-    prog.progress(value = 20, text = "Uploaded groupfile")
-    print("")
-    print("Copying Topology File: ")
-    scpClient.put("./"+topology_name["topologyfile"], remote_path='/tmp/topology.zip')
-    prog.progress(value = 30, text = "Uploaded topologyfile")
-    print("")
-    res = purge_topology(ssh)
-    prog.progress(text = "Purged old topology",value = 50)
-    if res == False:
-        print("Issues when Purging... cowardly exiting script now for you to debug")
-        exit()
-    print("Purged old Topology, now loading new Topology...")
-    res = load_topology(ssh)
-    prog.progress(text = "Topology loaded",value = 90)
-    if res == False:
-        print("Issues when Loading Group... cowardly exiting script now for you to debug")
-        exit()
-    print("Loaded Topology, now cleaning up")
-    stdint, stdout, stderr = ssh.exec_command("rm -f /tmp/group.zip")
-    if stdout.channel.recv_exit_status() != 0:
-        print ("Encountered Errors: "+stderr.read().decode('ascii'))
-        exit()
-    stdint, stdout, stderr = ssh.exec_command("rm -f /tmp/topology.zip")
-    if stdout.channel.recv_exit_status() != 0:
-        print ("Encountered Errors: "+stderr.read().decode('ascii'))
-        exit()
-    prog.progress(value = 100,text ="All Done")
+        topology_name = get_names("known-topologies/"+name)
+        # and then
+        print("Copying Group File: ")
+        scpClient.put("./"+topology_name["groupfile"], remote_path='/tmp/group.zip')
+        prog.progress(value = 20, text = "Uploaded groupfile")
+        print("")
+        print("Copying Topology File: ")
+        scpClient.put("./"+topology_name["topologyfile"], remote_path='/tmp/topology.zip')
+        prog.progress(value = 30, text = "Uploaded topologyfile")
+        print("")
+        res = purge_topology(ssh)
+        prog.progress(text = "Purged old topology",value = 50)
+        if res == False:
+            print("Issues when Purging... cowardly exiting script now for you to debug")
+            exit()
+        print("Purged old Topology, now loading new Topology...")
+        res = load_topology(ssh)
+        prog.progress(text = "Topology loaded",value = 90)
+        if res == False:
+            print("Issues when Loading Group... cowardly exiting script now for you to debug")
+            exit()
+        print("Loaded Topology, now cleaning up")
+        stdint, stdout, stderr = ssh.exec_command("rm -f /tmp/group.zip")
+        if stdout.channel.recv_exit_status() != 0:
+            print ("Encountered Errors: "+stderr.read().decode('ascii'))
+            exit()
+        stdint, stdout, stderr = ssh.exec_command("rm -f /tmp/topology.zip")
+        if stdout.channel.recv_exit_status() != 0:
+            print ("Encountered Errors: "+stderr.read().decode('ascii'))
+            exit()
+        prog.progress(value = 100,text ="All Done")
+    else:
+
+        topology_name = get_names("known-topologies/"+name)
+        namespace = "turbo"
+        if instance_data.get("namespace","") !="":
+            namespace = instance_data["namespace"]
+        load_topology_cluster(instance_data["kubeconfig"], topology_name, prog,namespace)
     if not persist:
         shutil.rmtree("known-topologies/"+name)
 
@@ -61,12 +72,15 @@ def createSSHClient(server, user, password, port=22):
     client.connect(server, port, user, password)
     return client
 def get_instance_data():
+    st.write(str(st.session_state))
     turboserver = st.session_state.turboserver
     username = st.session_state.username
     password = st.session_state.password
     authtoken = st.session_state.authtoken
     turboversion = st.session_state.turboversion
-    ssh_url = st.session_state.ssh_url 
+    ssh_url = st.session_state.get("ssh-address")
+    kubeconfig = st.session_state.get("kubeconfig")
+    namespace = st.session_state.get("namespace")
     if ssh_url == "":
         ssh_url = turboserver.replace("https://","").replace("/")
     ssh_password = st.session_state.ssh_password
@@ -79,6 +93,8 @@ def get_instance_data():
         "ssh-pw": ssh_password,
         "ssh-url": ssh_url,
         "entity_type": "n/a",
+        "kubeconfig": kubeconfig,
+        "namespace": namespace
     }
 
 
@@ -104,10 +120,13 @@ if disabled == False:
 
 run = st.button("Lets go" )
 if run:
+    instance_data = get_instance_data()
+    if select != "Upload new":
+        name = select
+        upload_topology(None, name, instance_data)
     if topology_file == "":
         topology_file = select
     if name =="":
         name = select
-    instance_data = get_instance_data()
-    upload_topology(topology_file, name)
+    upload_topology(topology_file, name, instance_data)
 populate_sidebar()
