@@ -9,7 +9,7 @@ st.set_page_config(
     page_icon="🌍",
 )
 
-def upload_topology(topology_file, name, instance_data):
+def upload_topology(topology_file, name, instance_data, persist):
     
     # First step: Unzip the file:
 
@@ -21,7 +21,7 @@ def upload_topology(topology_file, name, instance_data):
     prog.value = 10
     prog.text = "Extracted file"
     if instance_data["kubeconfig"] == "":
-        ssh = createSSHClient(instance_data["ssh-url"], "turbo", instance_data["ssh-pw"])
+        ssh = createSSHClient(instance_data["ssh_address"], "turbo", instance_data["ssh_pw"])
         scpClient = scp.SCPClient(ssh.get_transport(), progress=progress)
 
         topology_name = get_names("known-topologies/"+name)
@@ -72,13 +72,12 @@ def createSSHClient(server, user, password, port=22):
     client.connect(server, port, user, password)
     return client
 def get_instance_data():
-    st.write(str(st.session_state))
     turboserver = st.session_state.turboserver
     username = st.session_state.username
     password = st.session_state.password
     authtoken = st.session_state.authtoken
     turboversion = st.session_state.turboversion
-    ssh_url = st.session_state.get("ssh-address")
+    ssh_url = st.session_state.get("ssh_address")
     kubeconfig = st.session_state.get("kubeconfig")
     namespace = st.session_state.get("namespace")
     if ssh_url == "":
@@ -90,8 +89,8 @@ def get_instance_data():
         "cookie": authtoken,
         "url": "https://"+turboserver.replace("https://","").replace("/","")+"/",
         "scope": "n/a",
-        "ssh-pw": ssh_password,
-        "ssh-url": ssh_url,
+        "ssh_pw": ssh_password,
+        "ssh_address": ssh_url,
         "entity_type": "n/a",
         "kubeconfig": kubeconfig,
         "namespace": namespace
@@ -108,6 +107,7 @@ select = st.selectbox("Known Topologies", topologies)
 disabled = True
 topology_file = ""
 name = ""
+persist = False
 st.text(select)
 if select == "Upload new":
     disabled = False
@@ -117,16 +117,15 @@ if disabled == False:
     topology_file = st.file_uploader("Upload your topology file", disabled=disabled)
     name = st.text_input("Topology Name",placeholder="Customer_XX")
     persist = st.checkbox("Save for further Use", value=True)
-
 run = st.button("Lets go" )
 if run:
     instance_data = get_instance_data()
     if select != "Upload new":
         name = select
-        upload_topology(None, name, instance_data)
+        upload_topology(None, name, instance_data, persist)
     if topology_file == "":
         topology_file = select
     if name =="":
         name = select
-    upload_topology(topology_file, name, instance_data)
+    upload_topology(topology_file, name, instance_data, persist)
 populate_sidebar()
