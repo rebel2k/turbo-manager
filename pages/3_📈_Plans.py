@@ -8,6 +8,7 @@ def get_timestamp(offset_hours):
     timestamp -= offset_hours*(60*60)
     return timestamp
 def get_data(case_data, entity_type,uuid):
+    start_time = get_timestamp(24)
     # This function should handle the entity_type specific stuff like which parameters to gather etc. 
     if entity_type in ["Namespace", "ContainerPlatformCluster"]:
         #Statistic VCPURequest, VMemRequest, VMem, VCPU
@@ -24,7 +25,6 @@ def get_data(case_data, entity_type,uuid):
             res[entry["name"]] = value
         return res
     if entity_type in ["Cluster"]:
-        start_time = get_timestamp(24)
         end_time = get_timestamp(12)
         data = {"statistics":[{"name": "Mem"},  {"name": "numHosts"},{"name": "numCPUs"}],"startDate": str(start_time)}
         answer, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+uuid, data=json.dumps(data), cookie=case_data["cookie"])
@@ -33,14 +33,53 @@ def get_data(case_data, entity_type,uuid):
             for entry in stat["statistics"]:
                 value = entry["values"]["avg"]
                 if "Mem" in entry["name"]:
-                    value = value / 1024
+                    value = value / (1024*1024)
                 name = entry["name"]
                 if not "Request" in name:
                     name += "Limit"
                 res[entry["name"]] = value
         return res
+    if entity_type in ["BusinessApplication"]:
+        # First get BA name
+        answer, header = handle_request("GET", case_data["url"]+"api/v3/entities/"+uuid,cookie=case_data["cookie"])
+        name = answer["displayName"]
+        entity_list = get_generic_list(case_data, "api/v3/search?types=VirtualMachine&scopes="+uuid+"&order_by=NAME&ascending=true", get_list_fragment_vms_for_apps, {"Name": name})
+        # now get stats for all vms.. 
+        res = {}
+        res["count"] = len(entity_list)
+        for entry in entity_list: 
+            data = {"statistics":[{"name": "numVCPUs"},  {"name": "VMem"}],"startDate": str(start_time)}
+            entry_uuid = entry["Uuid"]
+            stats, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+entry_uuid, data=json.dumps(data), cookie=case_data["cookie"])
+            for entry in stats:
+                for stat in entry["statistics"]:
+                    value = 0 
+                    if stat.get("capacity", "") != "":
+                        value = stat["capacity"]["avg"]
+                    else:
+                        value = stat["values"]["avg"]
+                    if "Mem" in stat["name"]:
+                        value = value / (1024*1024)
+                    name = stat["name"]
+                    if res.get(name, "") != "":
+                        res[stat["name"]] += value
+                    else:
+                        res[name] = value
+        return res
 
-    
+
+        # Todo: Search for vmsByBusinessApplication with application name here, aggregate data over VMs... 
+
+def get_list_fragment_vms_for_apps(case_data, cursor, limit, q, query):
+    data = {"criteriaList": [{"expVal": query["Name"], "expType": "RXEQ", "filterType": "vmsByBusinessApplication", "caseSensitive": "false"}], "className":"VirtualMachine","logicalOperator": "AND"} 
+    res = []
+    count = 0
+    entries = []
+    answer, headers = handle_request("POST",case_data["url"]+"api/v3/search?cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"], data=json.dumps(data))
+
+    for entry in answer:
+        res.append({"Name": entry["displayName"], "Uuid": entry["uuid"]})
+    q.put(res)
 def get_list_fragment_entity(case_data, cursor, limit, q, query):
     res = []
     count = 0
@@ -68,6 +107,7 @@ populate_sidebar()
 case_data = get_instance_data()
 st.write("Create reports for different Entities:")
 entities = {"ContainerClusters": "ContainerPlatformCluster", "Namespaces": "Namespace", "OnPremise Cluster":"Cluster", "Applications": "BusinessApplication"}
+# For Applications: We take the underlying VMs (? does this make sense) as a baseline for provisioned ressources
 entity_select = st.selectbox("Entity Type", entities.keys(), on_change=cache_reset)
 # Selectbox to select entity Type
 func_data = {"Type": entities[entity_select]}
