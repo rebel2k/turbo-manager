@@ -18,6 +18,26 @@ cursor_steps = 100
 #config_file = os.path.join(os.path.abspath(config_path), "config", 'config.ini')
 config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", 'config.ini')
 
+def get_instance_data():
+    turboserver = st.session_state.turboserver
+    username = st.session_state.username
+    password = st.session_state.password
+    authtoken = st.session_state.authtoken
+    turboversion = st.session_state.turboversion
+    ssh_url = st.session_state.ssh_address
+    if ssh_url == "":
+        ssh_url = turboserver.replace("https://","").replace("/")
+    ssh_password = st.session_state.ssh_password
+    if ssh_password == "":
+        ssh_password = st.text_input("SSH-Password", type="password")
+    return {
+        "cookie": authtoken,
+        "url": "https://"+turboserver.replace("https://","").replace("/","")+"/",
+        "scope": "n/a",
+        "ssh-pw": ssh_password,
+        "ssh-url": ssh_url,
+        "entity_type": "n/a",
+    }
 # Read the config file
 def get_instance_from_config():
     instances = {}

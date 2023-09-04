@@ -734,13 +734,10 @@ def get_action_list_chunk_cloud(case_data, list_fragment, q):
        # print(str(cpu_action))
         count += 1    
     q.put(res)
-def get_generic_list(case_data, queue_func, entity_list=[]):
-    length = 0
-    if len(entity_list) == 0:
-        length = int(get_list_length(case_data))
-        print("Obtained length alternatively, value: "+str(length))
-    else:
-        length = len(entity_list)
+def get_generic_list(case_data, length_call, queue_func, func_data):
+    answer, header = handle_request("GET", case_data["url"]+length_call, cookie=case_data["cookie"])
+    print(str(header))
+    length = int(header["X-Total-Record-Count"])
     cursors, limit = get_cursors(length, THREAD_COUNT)
     count = 0
     # Get list of VMs in Scope:
@@ -750,10 +747,7 @@ def get_generic_list(case_data, queue_func, entity_list=[]):
     for cursor in cursors: 
         count = count + 1
         step = limit
-        if len(entity_list) == 0 and length != 0:
-            t = threading.Thread(target=queue_func, args=(case_data, cursor, limit, q))
-        else:
-            t = threading.Thread(target=queue_func, args=(case_data, entity_list[cursor:cursor+limit], q))
+        t = threading.Thread(target=queue_func, args=(case_data, cursor, limit, q, func_data))
         t.start()
         thread_list.append(t)
         
@@ -1155,6 +1149,12 @@ def print_to_file_k8s(case_data,entries):
         
     return result_values
 def get_cursors(length, threads):
+    if length < 100:
+        # no need to thread..
+        if length == 0:
+            length = 1
+        return  [0], length
+
     cursors = []
     last = length
     step = length
