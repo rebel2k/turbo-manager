@@ -8,6 +8,8 @@ import re
 import streamlit as st
 import time
 from io import StringIO
+import threading
+from streamlit.runtime.scriptrunner import add_script_run_ctx
 urllib3.disable_warnings()
 
 # Global configuration
@@ -113,19 +115,50 @@ def update_instance_in_config(name, username, password, address, ssh_password, s
    #     error_status = 2
    #     error_message = "Invalid Turbonomic server address. It should follow the format: \"https://<server_name>\" or \"https://<ip_address>\""
     return error_status, error_message
-
 # Authenticate a user with username and password credentials on the turboserver server
 # Returns the status code and the authentication token if successful
+def monitor_backend():
+    print("Now started")
+    last_check = int(time.time())
+    while True:
+        time.sleep(5)
+        if st.session_state.get("monitor_running", False) == False:
+            print(str(st.session_state))
+            print("No business to be running, bye")
+            break
+        current_time = int(time.time())
+        print("Checking if we should run : "+str(current_time - last_check))
+        if current_time - last_check > 5: # every 2 minutes ? 
+            res, error, msg = get_request( st.session_state.turboserver,st.session_state.authtoken, "admin/versions")
+            print("Checked backend Status")
+            if error == 0:
+                last_check = int(time.time())
+                print("Backend responded OK")
+            else:
+                st.session_state["monitor_running"] = False
+                reset_session()
+                print("Exiting: "+msg)
+                break
+
 def authenticate_user(username, password, turboserver):
     error_status = 0
     error_message = "OK"
     # Authentication of the user
     authentication_payload = {'username': username, 'password': password}
+    print("Attaching Context and starting")
     #print(authentication_payload)
     try:
         r = requests.post(turboserver+api_path+'login', data = authentication_payload, verify=False)
         if (r.status_code == 200):
             r.encoding = 'JSON'
+            # Below: Spawn thread to monitor Backend
+            if st.session_state.get("monitor_running", False) == False:
+                st.session_state["monitor_running"] = True
+                t = threading.Thread(target=monitor_backend, args=())
+                # Below is very unstable since its internal Streamlit API, subject to change..
+                print("Attaching Context and starting")
+                add_script_run_ctx(t)
+                t.start()
             error_message = r.headers['Set-Cookie'].split(';')[0]
             error_status = 0
     except requests.exceptions.RequestException as e:
