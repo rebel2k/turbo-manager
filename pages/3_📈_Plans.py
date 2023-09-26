@@ -27,6 +27,8 @@ def get_data(case_data, entity_type,uuid):
         action_count = 0
         for entry in action_list:
             if entry["actionType"] == "RESIZE":
+                if entry.get("compoundActions", "") == "":
+                    continue
                 for action in entry["compoundActions"]:
                     action_count += 1
                     value = float(action["newValue"]) - float(action["currentValue"]) 
