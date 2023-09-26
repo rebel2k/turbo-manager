@@ -1,5 +1,6 @@
 import os
 from functions import *
+from backend_functions import * 
 import streamlit as st
 import time
 from streamlit_extras.switch_page_button import switch_page
@@ -63,13 +64,13 @@ with st.container():
                     st.success("Logged in")
                     set_connection_info(instance, turboserver, username, password, ssh_address=ssh_address, ssh_password=ssh_password, kubeconfig=kubeconfig, namespace=namespace)
                     set_authtoken(username, password, turboserver)
-                    response, status, message = get_request(turboserver, authtoken, "admin/versions")
-                    if (status == 0):
+                    response, header, status = handle_request("GET", turboserver+"/api/v3/admin/versions", authtoken)
+                    if (status == 200):
                         st.success("Communication/REST API calls successful.")
                         set_turboversion(response["versionInfo"].split('\n')[0])
                     else:
                         st.error("Communication/REST API calls successful failed!")
-                        st.error(message)
+                        st.error(response["Error"])
                         set_turboversion("n/a")
             else:
                 with st.container():

@@ -153,39 +153,6 @@ def authenticate_user(username, password, turboserver):
         error_message = "Authentication failed!"
     return error_status, error_message
 
-# Run a GET Rest command and returns the resulting payload in json format
-def get_request(turboserver, authtoken, endpoint):
-    json_response = "n/a"
-    error_status = 0
-    error_message = "OK"
-    headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'cookie': authtoken}
-    url = turboserver+api_path+endpoint
-    try:
-        r = requests.get(url, headers = headers, verify=False)
-        if (r.status_code == 200):
-            error_status = 0
-            json_response = r.json()
-    except requests.exceptions.RequestException as e:
-        error_status = 1
-        error_message = "GET request failed!"
-    return json_response, error_status, error_message
-
-def post_request(turboserver, authtoken, endpoint, payload):
-    json_response = "n/a"
-    error_status = 0
-    error_message = "OK"
-    headers = {'accept': 'application/json', 'Content-Type': 'application/json', 'cookie': authtoken}
-    url = turboserver+api_path+endpoint
-    try:
-        r = requests.post(url, headers = headers, data=payload, verify=False)
-        if (r.status_code == 200):
-            error_status = 0
-            json_response = r.json()
-    except requests.exceptions.RequestException as e:
-        error_status = 1
-        error_message = "POST request failed!"
-    return json_response, error_status, error_message
-
 def populate_sidebar():
         
         st.sidebar.title("Connected Server Info")

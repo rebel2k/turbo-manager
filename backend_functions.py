@@ -46,9 +46,10 @@ def handle_request(type, url, cookie, data=None):
         if len(response.text) > 0:
             answer = response.json()
             #print(str(answer))
-        return answer, response.headers
+        return answer,  response.headers, response.status_code
     except Exception:
         print("could not extract JSON... text: "+response.text)
+        return {"Error": response.text}, response.headers, response.status_code
     
 def watch_deployment(client, deployment, namespace="turbo"):
     w = kubernetes.watch.Watch()
@@ -342,7 +343,7 @@ def create_entity_group(case_data, entity, group_name):
             "filterType": str(entry["criterion"]),
             "caseSensitive": False,
         })
-    answer, headers = handle_request("POST",case_data["url"]+"api/v3/groups",case_data["cookie"],json.dumps(data))
+    answer, _,_= handle_request("POST",case_data["url"]+"api/v3/groups",case_data["cookie"],json.dumps(data))
     return answer["uuid"],answer["membersCount"]
 
 def get_group_uuid(case_data, name):
@@ -355,7 +356,7 @@ def get_group_uuid(case_data, name):
         "filterType": "groupsByName",
         "caseSensitive": False,
     })
-    answer, headers = handle_request("POST",case_data["url"]+"api/v3/search", case_data["cookie"],data=json.dumps(data))
+    answer, _,_ = handle_request("POST",case_data["url"]+"api/v3/search", case_data["cookie"],data=json.dumps(data))
     ret = []
     if len(answer) == 1:
         return answer[0]["uuid"]
@@ -372,7 +373,7 @@ def search_by_filter(case_data, entity):
             "filterType": str(entry["criterion"]),
             "caseSensitive": False,
         })
-    answer, headers = handle_request("POST",case_data["url"]+"api/v3/search", case_data["cookie"],data=json.dumps(data))
+    answer, headers, _ = handle_request("POST",case_data["url"]+"api/v3/search", case_data["cookie"],data=json.dumps(data))
     ret = []
     for entry in answer:
         ret.append({"Name": entry["displayName"], "UUID": entry["uuid"]})
@@ -384,11 +385,11 @@ def search_by_filter(case_data, entity):
 
     return ret
 def get_entity(cookie, url, entry):
-    answer, headers= handle_request("GET",url+"api/v3/entities/"+entry,cookie)
+    answer, _,_= handle_request("GET",url+"api/v3/entities/"+entry,cookie)
     return answer["displayName"]  
 
 def get_entity_list_by_type(cookie, url, scope):
-    answer, headers= handle_request("GET",url+"api/v3/groups/"+str(scope), cookie)
+    answer, _,_= handle_request("GET",url+"api/v3/groups/"+str(scope), cookie)
     names = []
     for entry in answer["memberUuidList"]:
        names.append(get_entity(cookie, url, entry))
@@ -396,11 +397,11 @@ def get_entity_list_by_type(cookie, url, scope):
     return names
 
 def get_policy_list(case_data):
-    answer, headers = handle_request("GET",case_data["url"]+"api/v3/settingspolicies", case_data["cookie"])
+    answer, _,_ = handle_request("GET",case_data["url"]+"api/v3/settingspolicies", case_data["cookie"])
     return answer
 
 def set_policy(case_data, uuid, content):
-    answer, headers = handle_request("PUT",case_data["url"]+"api/v3/settingspolicies/"+uuid, case_data["cookie"],  data=json.dumps(content))
+    _, _,_ = handle_request("PUT",case_data["url"]+"api/v3/settingspolicies/"+uuid, case_data["cookie"],  data=json.dumps(content))
 
 def apply_restrictions_k8s(entity_list, exclude_scopes, case_data):
 
@@ -437,7 +438,7 @@ def apply_restrictions_k8s(entity_list, exclude_scopes, case_data):
     return exclude_scopes, entity_list
 
 def get_entity_type(case_data):
-    answer, headers = handle_request("GET",case_data["url"]+"api/v3/groups/"+str(case_data["scope"]), case_data["cookie"])
+    answer, _,_ = handle_request("GET",case_data["url"]+"api/v3/groups/"+str(case_data["scope"]), case_data["cookie"])
     case_data["entity_type"] = answer["groupType"]
     return case_data
 
@@ -460,7 +461,7 @@ def correlate_actions_k8s(entries, actions):
                 break
     return entries
 def get_action_list_chunk_k8s(case_data, data, cursor,limit, q):
-    answer, headers = handle_request("POST",case_data["url"]+"api/v3/groups/"+case_data["scope"]+"/actions?limit="+str(limit)+"&cursor="+str(cursor),case_data["cookie"], data=json.dumps(data))
+    answer, _,_ = handle_request("POST",case_data["url"]+"api/v3/groups/"+case_data["scope"]+"/actions?limit="+str(limit)+"&cursor="+str(cursor),case_data["cookie"], data=json.dumps(data))
     res = []
     count = 0
     total = 0
@@ -562,7 +563,7 @@ def get_action_list_chunk_k8s_related(case_data, list_fragment, q):
     }
     total = len(list_fragment)
     for entity in list_fragment:
-        answer, headers = handle_request("POST",case_data["url"]+"api/v3/entities/"+entity["UUID"]+"/actions",case_data["cookie"], data=json.dumps(data))
+        answer, _,_ = handle_request("POST",case_data["url"]+"api/v3/entities/"+entity["UUID"]+"/actions",case_data["cookie"], data=json.dumps(data))
         if answer == None:
             continue
         if case_data["entity_type"] != "VirtualMachine":
@@ -663,7 +664,7 @@ def get_action_list_chunk_cloud(case_data, list_fragment, q):
         data =  {"statistics":[{"name":"VCPU","groupBy":["percentile"]},{"name":"VMem","groupBy":["percentile"]},{"name":"numVCPUs","groupBy":["percentile"]}],"startDate":start_time,"endDate":end_time}
         cpu_action = {}
         memory_action = {}
-        answer, headers = handle_request("POST",case_data["url"]+"api/v3/stats/"+entity["UUID"]+"?disable_hateoas=true",case_data["cookie"], data=json.dumps(data))
+        answer,  _,_ = handle_request("POST",case_data["url"]+"api/v3/stats/"+entity["UUID"]+"?disable_hateoas=true",case_data["cookie"], data=json.dumps(data))
         if answer == None:
             print("Huh?")
             continue
@@ -718,7 +719,7 @@ def get_action_list_chunk_cloud(case_data, list_fragment, q):
                         cpu_action["Type"] = entry_type
                         cpu_action["UUID"] = entity["UUID"]
         # Now need to check for actions, otherwise we screw up our environment. 
-        answer_actions, headers = handle_request("GET", case_data["url"]+"api/v3/entities/"+entity["UUID"]+"/actions",case_data["cookie"])
+        answer_actions,  _,_ = handle_request("GET", case_data["url"]+"api/v3/entities/"+entity["UUID"]+"/actions",case_data["cookie"])
         for entry in answer_actions:
             if entry["risk"].get("reasonCommodities", "") != "":
                 if "VCPU" in entry["risk"]["reasonCommodities"]:
@@ -735,8 +736,7 @@ def get_action_list_chunk_cloud(case_data, list_fragment, q):
         count += 1    
     q.put(res)
 def get_generic_list(case_data, length_call, queue_func, func_data):
-    answer, header = handle_request("GET", case_data["url"]+length_call, cookie=case_data["cookie"])
-    print(str(header))
+    answer, header,_ = handle_request("GET", case_data["url"]+length_call, cookie=case_data["cookie"])
     length = int(header["X-Total-Record-Count"])
     cursors, limit = get_cursors(length, THREAD_COUNT)
     count = 0
@@ -767,7 +767,7 @@ def get_authentication_cookie(credentials):
     return r.cookies #TODO: Maybe also use the handle_requests function? this is easier since it is a singular occurence per session and we never else need the cookie..
 
 def get_list_length(case_data):
-    answer, headers = handle_request("GET",case_data["url"]+"api/v3/groups/"+case_data["scope"], case_data["cookie"])
+    answer,  _,_ = handle_request("GET",case_data["url"]+"api/v3/groups/"+case_data["scope"], case_data["cookie"])
     return str(answer["membersCount"])
 def get_detail_k8s(case_data, uuid):
     data = {}
@@ -814,7 +814,7 @@ def get_detail_k8s(case_data, uuid):
         },{
         "name": "numVCPUs"}]
     }
-    answer, headers = handle_request("POST",case_data["url"]+"api/v3/entities/"+uuid+"/stats",case_data["cookie"], json.dumps(data))
+    answer,  _,_ = handle_request("POST",case_data["url"]+"api/v3/entities/"+uuid+"/stats",case_data["cookie"], json.dumps(data))
     
     if len(answer) < 1:
         print("RETURNING EMPTY: ")
@@ -890,7 +890,7 @@ def progress_bar(current, total, bar_length=50):
         previous = current
         
 def get_list_chunk_k8s(case_data, cursor, limit, q):
-    list, headers = handle_request("GET",case_data["url"]+"api/v3/groups/"+case_data["scope"]+"/entities?cursor="+str(cursor)+"&limit="+str(limit),case_data["cookie"])
+    list,  _,_ = handle_request("GET",case_data["url"]+"api/v3/groups/"+case_data["scope"]+"/entities?cursor="+str(cursor)+"&limit="+str(limit),case_data["cookie"])
     result = []
     count = 0
     total = 0
@@ -955,13 +955,13 @@ def set_policies(case_data,policies):
         if entry["readOnly"] == True:
             continue
         uuid = entry["uuid"]
-        answer, headers = handle_request("PUT",case_data["url"]+"api/v3/settingspolicies/"+uuid, case_data["cookie"],  data=json.dumps(entry))
+        answer,  _,_ = handle_request("PUT",case_data["url"]+"api/v3/settingspolicies/"+uuid, case_data["cookie"],  data=json.dumps(entry))
         if "Container" in entry["displayName"] :
             print(str(answer))
         count += 1
     return True
 def get_market_data(case_data, uuid):
-    answer, header = handle_request("GET", case_data["url"]+"api/v3/markets/"+uuid+"/stats", case_data["cookie"])
+    answer,  _,_ = handle_request("GET", case_data["url"]+"api/v3/markets/"+uuid+"/stats", case_data["cookie"])
     returnVal = {"Name": answer[0]["displayName"], "Hosts":{"Current": 0, "Projected": 0}, "Mem": {"Current": 0, "Projected": 0},"CPU": {"Current": 0, "Projected": 0},"VMem": {"Current": 0, "Projected": 0}, "VCPU": {"Current": 0, "Projected": 0}, "Storages": {"Current": 0, "Projected": 0}, "Space":{"Current": 0, "Projected": 0}}
     for entry in answer[0]["statistics"]:
         if entry["name"] == "VMem" and entry["relatedEntityType"] == "VirtualMachine":
@@ -1009,10 +1009,10 @@ def get_market_data(case_data, uuid):
     
 def create_plan(case_data, plan_name, market_uuid, scenario_uuid):
     data = {"plan_market_name": plan_name}
-    answer, headers = handle_request("POST", case_data["url"]+"api/v3/markets/"+market_uuid+"/scenarios/"+scenario_uuid, case_data["cookie"],data=json.dumps(data))
+    answer,  _,_ = handle_request("POST", case_data["url"]+"api/v3/markets/"+market_uuid+"/scenarios/"+scenario_uuid, case_data["cookie"],data=json.dumps(data))
     return {"uuid": answer["uuid"], "Name": answer["displayName"]}
 def is_market_done(case_data, uuid):
-    answer, headers = handle_request("GET", case_data["url"]+"api/v3/markets/"+uuid, case_data["cookie"])
+    answer,  _,_ = handle_request("GET", case_data["url"]+"api/v3/markets/"+uuid, case_data["cookie"])
     if answer["stateProgress"] == 100:
         return True
     return False
@@ -1021,7 +1021,7 @@ def create_scenario(case_data, name, uuid, type):
     case_data["scope"] = uuid
     if int(get_list_length(case_data)) > 0:
         data = {"scope": [{"uuid":uuid}], "displayName": name, "type": type}
-        answer, headers = handle_request("POST", case_data["url"]+"api/v3/scenarios", case_data["cookie"], data=json.dumps(data))
+        answer,  _,_ = handle_request("POST", case_data["url"]+"api/v3/scenarios", case_data["cookie"], data=json.dumps(data))
         return answer["uuid"]
     else:
         return -1
@@ -1047,9 +1047,9 @@ def get_active_policies(case_data, group_uuid, entity=False):
     answer = {}
     if entity == True:
         print("Getting policies for entity, not group")
-        answer, headers = handle_request("GET", case_data["url"]+"api/v3/entities/"+group_uuid+"/settings?include_settingspolicies=true", case_data["cookie"])
+        answer,  _,_ = handle_request("GET", case_data["url"]+"api/v3/entities/"+group_uuid+"/settings?include_settingspolicies=true", case_data["cookie"])
     else:
-        answer, headers = handle_request("GET", case_data["url"]+"api/v3/groups/"+group_uuid+"/settings?include_settingspolicies=true", case_data["cookie"])
+        answer,  _,_ = handle_request("GET", case_data["url"]+"api/v3/groups/"+group_uuid+"/settings?include_settingspolicies=true", case_data["cookie"])
     active_policies = []
     for entry in answer:
         for setting in entry["settings"]:
@@ -1067,7 +1067,7 @@ def create_policy(case_data,uuid, policy_name, entityType, managerCategory, sett
              "settings":[{"uuid": settingsUuid, "value": value}]}
         ]
     }
-    answer, headers = handle_request("POST", case_data["url"]+"api/v3/settingspolicies", case_data["cookie"], data=json.dumps(data))
+    answer,  _,_ = handle_request("POST", case_data["url"]+"api/v3/settingspolicies", case_data["cookie"], data=json.dumps(data))
     return answer
 def get_percentage(a, b):
     if b > 0:
@@ -1176,7 +1176,7 @@ def get_cursors(length, threads):
     return cursors, step
 
 def get_group_name(case_data, scope):
-    answer,headers = handle_request("GET",case_data["url"]+"api/v3/groups/"+scope,case_data["cookie"])
+    answer, _,_ = handle_request("GET",case_data["url"]+"api/v3/groups/"+scope,case_data["cookie"])
     return answer["displayName"]
 def get_entity_list_chunk(case_data, list_fragment,q):
     res = []
@@ -1186,7 +1186,7 @@ def get_entity_list_chunk(case_data, list_fragment,q):
         mem_req = 0
         cpu_limit = 0
         mem_limit = 0
-        answer, headers = handle_request("GET",case_data["url"]+"api/v3/entities/"+list_entry["UUID"]+"/stats", case_data["cookie"])
+        answer,  _,_ = handle_request("GET",case_data["url"]+"api/v3/entities/"+list_entry["UUID"]+"/stats", case_data["cookie"])
         
         for stat in answer[0]["statistics"]:
             if "numCPUs" in stat["name"]:

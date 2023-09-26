@@ -1,6 +1,7 @@
 import os
-from functions import get_request, post_request
+from backend_functions import handle_request
 import streamlit as st
+import json
 
 st.set_page_config(
     page_title="Reporting",
@@ -20,8 +21,8 @@ else:
     turboversion = st.session_state.turboversion
 
 # Get Global Topology Stats
-global_stats, status, message = get_request(turboserver, authtoken, "supplychains?disable_hateoas=true&environment_type=HYBRID&health=true&uuids=Market")
-if (status == 0):
+global_stats, header, status = handle_request("GET",turboserver+"/api/v3/supplychains?disable_hateoas=true&environment_type=HYBRID&health=true&uuids=Market", authtoken )
+if (status == 200):
     st.success("Global Topology Data retrieval successful.")
     #st.write(global_stats["seMap"])
     # Create 6 columns to display metrics
@@ -37,9 +38,9 @@ else:
     st.error("Global Topology Data retrieval failed!")
 
 # Get On-Prem Resize Actions impact for Virtual Machines  
-payload = '{"environmentType":"ONPREM","targetEntityTypes":["VirtualMachine"],"relatedEntityTypes":["VirtualMachine"],"actionTypeList":["RESIZE"]}'
-response, status, message = post_request(turboserver, authtoken, "markets/Market/actions", payload)
-if (status == 0):
+payload = {"environmentType":"ONPREM","targetEntityTypes":["VirtualMachine"],"relatedEntityTypes":["VirtualMachine"],"actionTypeList":["RESIZE"]}
+response, header,status = handle_request("POST",turboserver+"/api/v3/markets/77777/actions", authtoken, json.dumps(payload))
+if (status == 200):
     st.success("On-Prem Resize Data retrieval successful.")
     vcpu_diff = 0
     vmem_diff = 0
