@@ -49,6 +49,7 @@ def get_data(case_data, entity_type,uuid):
         res["ActionCount"] = action_count
         return res
     if entity_type in ["Cluster"]:
+        print("Started Cluster aggregation")
         data = {"statistics":[{"name": "Mem"},  {"name": "numHosts"},{"name": "numCPUs"}],"startDate": str(start_time)}
         answer, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+uuid, data=json.dumps(data), cookie=case_data["cookie"])
         res = {}
@@ -60,8 +61,16 @@ def get_data(case_data, entity_type,uuid):
                 res[entry["name"]] = value
         # Have to get actions on a VM Level, so first get all VMs in the Cluster... 
         entity_list = get_generic_list(case_data, "api/v3/search?types=VirtualMachine&scopes="+uuid+"&order_by=NAME&ascending=true", get_list_fragment_vms_for_hosts, {"Uuid":uuid}) 
-        for entry in entity_list:
-            res = handle_action_vm(res, entry)
+        print("Received entity List, handling actions")
+        res_list = threadify_list(entity_list, handle_action_vm_thread_ready )
+        res = {}
+        for entry in res_list:
+            # Handle this list via threads to speed up..
+            for key in entry:
+                if res.get(key, "") == "":
+                    res[key] = entry[key]
+                else: 
+                    res[key] += entry[key]
         return res
     if entity_type in ["BusinessApplication"]:
         # First get BA name
@@ -71,6 +80,7 @@ def get_data(case_data, entity_type,uuid):
         # now get stats for all vms.. 
         res = {}
         res["count"] = len(entity_list)
+        print(str(entity_list))
         for entry in entity_list: 
             data = {"statistics":[{"name": "numVCPUs"},  {"name": "VMem"}],"startDate": str(start_time)}
             entry_uuid = entry["Uuid"]
@@ -95,6 +105,30 @@ def get_data(case_data, entity_type,uuid):
 
 
         # Todo: Search for vmsByBusinessApplication with application name here, aggregate data over VMs... 
+def handle_action_vm_thread_ready(list,q):
+    res = {}
+    for entry in list:
+        answer, _ = handle_request("GET", case_data["url"]+"api/v3/entities/"+entry["Uuid"]+"/actions", cookie=case_data["cookie"])
+        local_action_count = 0 
+        for entry in answer:
+            if entry["actionType"] == "RESIZE":
+                local_action_count += 1
+                value = float(entry["newValue"]) - float(entry["currentValue"])
+                action_type = ""
+                if "VCPU" in entry["details"]:
+                    action_type = "VCPU"
+                else: 
+                    action_type ="VMem"
+                    value = value / (1024*1024)
+                if res.get("Action_"+action_type, "") == "":
+                    res["Action_"+action_type] = value
+                else:
+                    res["Action_"+action_type] += value
+        if res.get("ActionCount","") == "":
+            res["ActionCount"] =  local_action_count
+        else: 
+            res["ActionCount"] += local_action_count
+    q.put(res)
 def handle_action_vm(res, entry):
     answer, _ = handle_request("GET", case_data["url"]+"api/v3/entities/"+entry["Uuid"]+"/actions", cookie=case_data["cookie"])
     local_action_count = 0 
@@ -135,6 +169,7 @@ def get_list_fragment_for_actions(case_data, cursor, limit, q, query):
     q.put(res)
 def get_list_fragment_vms_for_apps(case_data, cursor, limit, q, query):
     data = {"criteriaList": [{"expVal": query["Name"], "expType": "RXEQ", "filterType": "vmsByBusinessApplication", "caseSensitive": "false"}], "className":"VirtualMachine","logicalOperator": "AND"} 
+    print("Searching for: "+str(data))
     res = []
     count = 0
     entries = []
