@@ -765,7 +765,6 @@ def get_generic_list(case_data, length_call, queue_func, func_data):
     res_list = []
     for cursor in cursors: 
         count = count + 1
-        print("Spawning Thread: "+str(count)+" length: "+str(limit))
         step = limit
         t = threading.Thread(target=queue_func, args=(case_data, cursor, limit, q, func_data))
         t.start()

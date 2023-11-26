@@ -7,22 +7,18 @@ def get_timestamp(offset_hours):
     timestamp = int(time())
     timestamp -= offset_hours*(60*60)
     return timestamp
-def get_data(case_data, entity_type,uuid):
-    start_time = get_timestamp(24)
-    # This function should handle the entity_type specific stuff like which parameters to gather etc. 
-    if entity_type in ["Namespace", "ContainerPlatformCluster"]:
-        #Statistic VCPURequest, VMemRequest, VMem, VCPU
-        data = {"statistics":[{"name": "VCPU"}, {"name": "VCPURequest",},{"name": "VMem"}, {"name": "VMemRequest"}]}
-        answer, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+uuid, data=json.dumps(data), cookie=case_data["cookie"])
-        res = {}
-        for entry in answer[0]["statistics"]:
-            value = entry["values"]["avg"]
-            if "Mem" in entry["name"]:
-                value = value / 1024
-            name = entry["name"]
-            if name.find("Request") == -1:
-                name += "Limit"
-            res[name] = value
+def handle_container_actions(uuid):
+     data = {"statistics":[{"name": "VCPU"}, {"name": "VCPURequest",},{"name": "VMem"}, {"name": "VMemRequest"}]}
+     answer, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+uuid, data=json.dumps(data), cookie=case_data["cookie"])
+     res = {}
+     for entry in answer[0]["statistics"]:
+        value = entry["values"]["avg"]
+        if "Mem" in entry["name"]:
+            value = value / 1024
+        name = entry["name"]
+        if name.find("Request") == -1:
+            name += "Limit"
+        res[name] = value
         action_list = get_generic_list(case_data, "api/v3/entities/"+uuid+"/actions", get_list_fragment_for_actions, {"Uuid": uuid})
         action_count = 0
         for entry in action_list:
@@ -47,6 +43,13 @@ def get_data(case_data, entity_type,uuid):
                     else:
                         res["Action_"+action_type] += value
         res["ActionCount"] = action_count
+     return res
+def get_data(case_data, entity_type,uuid):
+    start_time = get_timestamp(24)
+    # This function should handle the entity_type specific stuff like which parameters to gather etc. 
+    if entity_type in ["Namespace", "ContainerPlatformCluster"]:
+        #Statistic VCPURequest, VMemRequest, VMem, VCPU
+        res =  handle_container_actions(uuid)
         return res
     if entity_type in ["Cluster"]:
         print("Started Cluster aggregation")
@@ -75,12 +78,11 @@ def get_data(case_data, entity_type,uuid):
     if entity_type in ["BusinessApplication"]:
         # First get BA name
         answer, header = handle_request("GET", case_data["url"]+"api/v3/entities/"+uuid,cookie=case_data["cookie"])
-        name = answer["displayName"]
-        entity_list = get_generic_list(case_data, "api/v3/search?types=VirtualMachine&scopes="+uuid+"&order_by=NAME&ascending=true", get_list_fragment_vms_for_apps, {"Name": name})
+        business_app_name = answer["displayName"]
+        entity_list = get_generic_list(case_data, "api/v3/search?types=VirtualMachine&scopes="+uuid+"&order_by=NAME&ascending=true", get_list_fragment_search, {"Name": business_app_name, "className": "VirtualMachine", "filterType": "vmsByBusinessApplication"})
         # now get stats for all vms.. 
         res = {}
-        res["count"] = len(entity_list)
-        print(str(entity_list))
+        res["VM count"] = len(entity_list)
         for entry in entity_list: 
             data = {"statistics":[{"name": "numVCPUs"},  {"name": "VMem"}],"startDate": str(start_time)}
             entry_uuid = entry["Uuid"]
@@ -99,16 +101,83 @@ def get_data(case_data, entity_type,uuid):
                         res[stat["name"]] += value
                     else:
                         res[name] = value
-            res = handle_action_vm(res, entry)
-            # Now get the actions for every entity (can copy and paste from above)
-        return res
-
-
-        # Todo: Search for vmsByBusinessApplication with application name here, aggregate data over VMs... 
+            res_list = threadify_list(entity_list, handle_action_vm_thread_ready )
+            for entry in res_list:
+                # Handle this list via threads to speed up..
+                for key in entry:
+                    if res.get(key, "") == "":
+                        res[key] = entry[key]
+                    else: 
+                        res[key] += entry[key]
+            print(str(res))
+            entity_list = get_generic_list(case_data, "api/v3/search?types=ContainerPod&order_by=NAME&ascending=true", get_list_fragment_search, {"Name": business_app_name, "className": "Container", "filterType": "containersByBusinessApplication"})
+            res_list = threadify_list(entity_list, get_wl_controller_thread_ready)
+            
+            wl_list = []
+            for entry in res_list: 
+                for key in entry.keys():
+                    wl_list.append(entry[key])
+            res_list = threadify_list(wl_list, get_wl_controller_actions_thread_ready)
+            print(str(res_list))
+            for entry in res_list:
+                # Handle this list via threads to speed up..
+                for key in entry:
+                    if res.get(key, "") == "":
+                        res[key] = entry[key]
+                    else: 
+                        res[key] += entry[key]
+            
+            return res
+            # Todo : handle containers.. 
+            # Could do a search of COntainers per Business app.. from there need to figure out the involved Workload Controllers to generate savings ? 
+            # Collect unique WL controllers per identified COntainer.. 
+            # Do a scrape of the Entity, then look into the providers, gather all unique UUIDs. 
+            # Then get actions on those WL Controllers
+def get_wl_controller_actions_thread_ready(list, q):
+    res = {}
+    action_count = 0
+    for entity in list: 
+        print(str(entity))
+        
+        action_list = get_generic_list(case_data, "api/v3/entities/"+entity+"/actions", get_list_fragment_for_actions, {"Uuid": entity})
+        for entry in action_list:
+                if entry["actionType"] == "RESIZE":
+                    if entry.get("compoundActions", "") == "":
+                        continue
+                    for action in entry["compoundActions"]:
+                        action_count += 1
+                        value = float(action["newValue"]) - float(action["currentValue"]) 
+                        action_type = ""
+                        if "VMem" in action["details"]:
+                            action_type = "VMem"
+                            value = value / 1024
+                        else:
+                            action_type = "VCPU"
+                        if "Request" in action["details"]:
+                            action_type += "Request"
+                        else:
+                            action_type += "Limit"
+                        if res.get("Action_"+action_type, "") == "":
+                            res["Action_"+action_type] = value
+                        else:
+                            res["Action_"+action_type] += value
+    res["Container ActionCount"] = action_count
+    q.put(res)
+def get_wl_controller_thread_ready(list, q):
+    res = {}
+    for entry in list:
+        answer, _ = handle_request("GET", case_data["url"]+"api/v3/entities/"+entry["Uuid"]+"?include_aspects=true", cookie=case_data["cookie"])
+        if answer["aspects"].get("containerPlatformContextAspect", "") != "":
+                if answer["aspects"]["containerPlatformContextAspect"].get("workloadControllerEntity", "") != "":
+                    res[entry["Uuid"]] = answer["aspects"]["containerPlatformContextAspect"]["workloadControllerEntity"]["uuid"]
+                   
+    q.put(res)
+    
 def handle_action_vm_thread_ready(list,q):
     res = {}
     for entry in list:
         answer, _ = handle_request("GET", case_data["url"]+"api/v3/entities/"+entry["Uuid"]+"/actions", cookie=case_data["cookie"])
+        print("Length for this VM: "+str(len(answer)))
         local_action_count = 0 
         for entry in answer:
             if entry["actionType"] == "RESIZE":
@@ -124,33 +193,11 @@ def handle_action_vm_thread_ready(list,q):
                     res["Action_"+action_type] = value
                 else:
                     res["Action_"+action_type] += value
-        if res.get("ActionCount","") == "":
-            res["ActionCount"] =  local_action_count
+        if res.get("VM ActionCount","") == "":
+            res["VM ActionCount"] =  local_action_count
         else: 
-            res["ActionCount"] += local_action_count
+            res["VM ActionCount"] += local_action_count
     q.put(res)
-def handle_action_vm(res, entry):
-    answer, _ = handle_request("GET", case_data["url"]+"api/v3/entities/"+entry["Uuid"]+"/actions", cookie=case_data["cookie"])
-    local_action_count = 0 
-    for entry in answer:
-        if entry["actionType"] == "RESIZE":
-            local_action_count += 1
-            value = float(entry["newValue"]) - float(entry["currentValue"])
-            action_type = ""
-            if "VCPU" in entry["details"]:
-                action_type = "VCPU"
-            else: 
-                action_type ="VMem"
-                value = value / (1024*1024)
-            if res.get("Action_"+action_type, "") == "":
-                res["Action_"+action_type] = value
-            else:
-                res["Action_"+action_type] += value
-    if res.get("ActionCount","") == "":
-        res["ActionCount"] =  local_action_count
-    else: 
-        res["ActionCount"] += local_action_count
-    return res
 def get_list_fragment_vms_for_hosts(case_data, cursor, limit, q, query):
     res = []
     count = 0
@@ -167,14 +214,13 @@ def get_list_fragment_for_actions(case_data, cursor, limit, q, query):
     for entry in answer:
         res.append(entry)
     q.put(res)
-def get_list_fragment_vms_for_apps(case_data, cursor, limit, q, query):
-    data = {"criteriaList": [{"expVal": query["Name"], "expType": "RXEQ", "filterType": "vmsByBusinessApplication", "caseSensitive": "false"}], "className":"VirtualMachine","logicalOperator": "AND"} 
-    print("Searching for: "+str(data))
+def get_list_fragment_search(case_data, cursor, limit, q, query):
+    searchName = query["Name"].replace("(",".*").replace(")", ".*").replace("[",".*").replace("]",".*")
+    data = {"criteriaList": [{"expVal": searchName, "expType": "RXEQ", "filterType": query["filterType"], "caseSensitive": "false"}], "className":query["className"],"logicalOperator": "AND"} 
     res = []
     count = 0
     entries = []
     answer, headers = handle_request("POST",case_data["url"]+"api/v3/search?cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"], data=json.dumps(data))
-
     for entry in answer:
         res.append({"Name": entry["displayName"], "Uuid": entry["uuid"]})
     q.put(res)
