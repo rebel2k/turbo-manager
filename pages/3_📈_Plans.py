@@ -163,6 +163,7 @@ def get_wl_controller_actions_thread_ready(list, q):
                             res["Action_"+action_type] += value
     res["Container ActionCount"] = action_count
     q.put(res)
+    
 def get_wl_controller_thread_ready(list, q):
     res = {}
     for entry in list:
