@@ -117,6 +117,13 @@ def handle_action_vm(res, entry):
     else: 
         res["ActionCount"] += local_action_count
     return res
+
+def get_list_fragment_for_actions(case_data, cursor, limit, q, query):
+    answer, headers = handle_request("GET",case_data["url"]+"api/v3/entities/"+query["Uuid"]+"/actions?cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"])
+    res = []
+    for entry in answer:
+        res.append(entry)
+    q.put(res)
 def get_list_fragment_vms_for_hosts(case_data, cursor, limit, q, query):
     res = []
     count = 0
@@ -127,35 +134,9 @@ def get_list_fragment_vms_for_hosts(case_data, cursor, limit, q, query):
         res.append({"Name": entry["displayName"], "Uuid": entry["uuid"]})
     q.put(res)
 
-def get_list_fragment_for_actions(case_data, cursor, limit, q, query):
-    answer, headers = handle_request("GET",case_data["url"]+"api/v3/entities/"+query["Uuid"]+"/actions?cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"])
-    res = []
-    for entry in answer:
-        res.append(entry)
-    q.put(res)
-def get_list_fragment_vms_for_apps(case_data, cursor, limit, q, query):
-    data = {"criteriaList": [{"expVal": query["Name"], "expType": "RXEQ", "filterType": "vmsByBusinessApplication", "caseSensitive": "false"}], "className":"VirtualMachine","logicalOperator": "AND"} 
-    res = []
-    count = 0
-    entries = []
-    answer, headers = handle_request("POST",case_data["url"]+"api/v3/search?cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"], data=json.dumps(data))
-
     for entry in answer:
         res.append({"Name": entry["displayName"], "Uuid": entry["uuid"]})
     q.put(res)
-def get_list_fragment_entity(case_data, cursor, limit, q, query):
-    res = []
-    count = 0
-    entries = []
-    answer, headers = handle_request("GET",case_data["url"]+"api/v3/search?types="+query["Type"]+"&cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"])
-
-    for entry in answer:
-        parent = ""
-        if len(entry.get("providers", [])) > 0:
-            parent = entry["providers"][0]["displayName"]+" / "
-        res.append({"Name": parent+entry["displayName"], "Uuid": entry["uuid"]})
-    q.put(res)
-
 def cache_reset():
     st.cache_resource.clear()
 
