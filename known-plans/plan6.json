@@ -1,0 +1,69 @@
+{
+    "description": "Container Sizing, No VM Sizing",
+    "planData": {
+        "configChanges": {
+            "addPolicyList": [],
+            "automationSettingList": [
+                {
+                    "uuid": "resize",
+                    "displayName": "Scale for Containers",
+                    "value": "AUTOMATIC",
+                    "entityType": "Container"
+                },
+                {
+                    "uuid": "move",
+                    "displayName": "Move for Container Pods",
+                    "value": "AUTOMATIC",
+                    "entityType": "ContainerPod"
+                },
+                {
+                    "uuid": "resize",
+                    "displayName": "Scale for Virtual Machines",
+                    "value": "DISABLED",
+                    "entityType": "VirtualMachine"
+                },
+                {
+                    "uuid": "provision",
+                    "displayName": "Provision for Virtual Machines",
+                    "value": "DISABLED",
+                    "entityType": "VirtualMachine"
+                },
+                {
+                    "uuid": "suspend",
+                    "displayName": "Suspend for Virtual Machines",
+                    "value": "DISABLED",
+                    "entityType": "VirtualMachine"
+                }
+            ],
+            "removeConstraintList": [],
+            "removePolicyList": [],
+            "riSettingList": [],
+            "osMigrationSettingList": [],
+            "subscription": {},
+            "includedCoupons": {
+                "includedCouponOidsList": null,
+                "isWhiteList": true
+            }
+        },
+        "displayName": "Optimize Container Cluster 4",
+        "loadChanges": {
+            "utilizationList": [],
+            "maxUtilizationList": []
+        },
+        "scope": [
+            {
+                "uuid": "74897703445454",
+                "className": "ContainerPlatformCluster"
+            }
+        ],
+        "topologyChanges": {
+            "addList": [],
+            "migrateList": [],
+            "removeList": [],
+            "replaceList": [],
+            "relievePressureList": []
+        },
+        "type": "OPTIMIZE_CONTAINER_CLUSTER",
+        "timebasedTopologyChanges": {}
+    }
+}

@@ -1,0 +1,57 @@
+{
+    "description": "No Container Sizing, No VM Sizing",
+    "planData": {
+        "configChanges": {
+            "addPolicyList": [],
+            "automationSettingList": [
+                {
+                    "uuid": "move",
+                    "displayName": "Move for Container Pods",
+                    "value": "AUTOMATIC",
+                    "entityType": "ContainerPod"
+                },
+                {
+                    "uuid": "provision",
+                    "displayName": "Provision for Virtual Machines",
+                    "value": "AUTOMATIC",
+                    "entityType": "VirtualMachine"
+                },
+                {
+                    "uuid": "suspend",
+                    "displayName": "Suspend for Virtual Machines",
+                    "value": "AUTOMATIC",
+                    "entityType": "VirtualMachine"
+                }
+            ],
+            "removeConstraintList": [],
+            "removePolicyList": [],
+            "riSettingList": [],
+            "osMigrationSettingList": [],
+            "subscription": {},
+            "includedCoupons": {
+                "includedCouponOidsList": null,
+                "isWhiteList": true
+            }
+        },
+        "displayName": "PLAN NAME",
+        "loadChanges": {
+            "utilizationList": [],
+            "maxUtilizationList": []
+        },
+        "scope": [
+            {
+                "uuid": "74897703445454",
+                "className": "ContainerPlatformCluster"
+            }
+        ],
+        "topologyChanges": {
+            "addList": [],
+            "migrateList": [],
+            "removeList": [],
+            "replaceList": [],
+            "relievePressureList": []
+        },
+        "type": "OPTIMIZE_CONTAINER_CLUSTER",
+        "timebasedTopologyChanges": {}
+    }
+}
