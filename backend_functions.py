@@ -734,9 +734,28 @@ def get_action_list_chunk_cloud(case_data, list_fragment, q):
        # print(str(cpu_action))
         count += 1    
     q.put(res)
+def threadify_list(list, queue_func):
+    q = queue.Queue()
+    thread_list = []
+    res_list = []
+    cursors, limit = get_cursors(len(list), THREAD_COUNT)
+    for cursor in cursors: 
+        subList = list[cursor:cursor+limit]
+        if len(subList) == 0: 
+            break
+        t = threading.Thread(target=queue_func, args=(subList,q))
+        t.start()
+        thread_list.append(t)
+        
+    for x in thread_list:
+        x.join()
+    while q.qsize() > 0:
+        res_list.append(q.get())
+    
+    return res_list   
+
 def get_generic_list(case_data, length_call, queue_func, func_data):
     answer, header = handle_request("GET", case_data["url"]+length_call, cookie=case_data["cookie"])
-    print(str(header))
     length = int(header["X-Total-Record-Count"])
     cursors, limit = get_cursors(length, THREAD_COUNT)
     count = 0
