@@ -1,0 +1,90 @@
+{
+    "description": "85% Utilization, Scaling OFF",
+    "planData": {
+        "configChanges": {
+            "addPolicyList": [],
+            "automationSettingList": [
+                {
+                    "uuid": "utilTarget",
+                    "value": 85
+                },
+                {
+                    "uuid": "targetBand",
+                    "value": 10
+                },
+                {
+                    "uuid": "resize",
+                    "displayName": "Scale for Virtual Machines",
+                    "value": "DISABLED",
+                    "entityType": "VirtualMachine"
+                },
+                {
+                    "uuid": "suspend",
+                    "displayName": "Suspend for Hosts",
+                    "value": "AUTOMATIC",
+                    "entityType": "PhysicalMachine"
+                },
+                {
+                    "uuid": "provision",
+                    "displayName": "Provision for Hosts",
+                    "value": "AUTOMATIC",
+                    "entityType": "PhysicalMachine"
+                },
+                {
+                    "uuid": "reconfigure",
+                    "displayName": "Reconfigure for Hosts",
+                    "value": "AUTOMATIC",
+                    "entityType": "PhysicalMachine"
+                },
+                {
+                    "uuid": "suspend",
+                    "displayName": "Suspend for Storage Devices",
+                    "value": "AUTOMATIC",
+                    "entityType": "Storage"
+                },
+                {
+                    "uuid": "resize",
+                    "displayName": "Scale for Storage Devices",
+                    "value": "AUTOMATIC",
+                    "entityType": "Storage"
+                },
+                {
+                    "uuid": "provision",
+                    "displayName": "Provision for Storage Devices",
+                    "value": "AUTOMATIC",
+                    "entityType": "Storage"
+                }
+            ],
+            "removeConstraintList": [],
+            "removePolicyList": [],
+            "riSettingList": [],
+            "osMigrationSettingList": [],
+            "subscription": {},
+            "includedCoupons": {
+                "includedCouponOidsList": null,
+                "isWhiteList": true
+            }
+        },
+        "displayName": "PLAN NAME",
+        "loadChanges": {
+            "utilizationList": [],
+            "maxUtilizationList": []
+        },
+        "scope": [
+            {
+                "uuid": "286108959344582",
+                "displayName": "vc01dc01/vc01dc01-Production",
+                "className": "Cluster"
+            }
+        ],
+        "topologyChanges": {
+            "addList": [],
+            "migrateList": [],
+            "removeList": [],
+            "replaceList": [],
+            "relievePressureList": []
+        },
+        "type": "OPTIMIZE_ONPREM",
+        "timebasedTopologyChanges": {}
+    }
+}

@@ -345,6 +345,26 @@ def create_entity_group(case_data, entity, group_name):
     answer, headers = handle_request("POST",case_data["url"]+"api/v3/groups",case_data["cookie"],json.dumps(data))
     return answer["uuid"],answer["membersCount"]
 
+def get_list_fragment_entity(case_data, cursor, limit, q, query):
+    res = []
+    count = 0
+    entries = []
+    answer, headers = handle_request("GET",case_data["url"]+"api/v3/search?types="+query["Type"]+"&cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"])
+
+    for entry in answer:
+        parent = ""
+        if len(entry.get("providers", [])) > 0:
+            parent = entry["providers"][0]["displayName"]+" / "
+        res.append({"Name": parent+entry["displayName"], "Uuid": entry["uuid"]})
+    q.put(res)
+
+def get_list_fragment_vms_for_apps(case_data, cursor, limit, q, query):
+    data = {"criteriaList": [{"expVal": query["Name"], "expType": "RXEQ", "filterType": "vmsByBusinessApplication", "caseSensitive": "false"}], "className":"VirtualMachine","logicalOperator": "AND"} 
+    res = []
+    count = 0
+    entries = []
+    answer, headers = handle_request("POST",case_data["url"]+"api/v3/search?cursor="+str(cursor)+"&limit="+str(limit)+"&order_by=NAME&ascending=true",case_data["cookie"], data=json.dumps(data))
+
 def get_group_uuid(case_data, name):
     data = {
         "criteriaList": [], "className": "Group", "logicalOperator": "AND"
