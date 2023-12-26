@@ -8,10 +8,10 @@ def get_timestamp(offset_hours):
     timestamp -= offset_hours*(60*60)
     return timestamp
 def handle_container_actions(uuid):
-     data = {"statistics":[{"name": "VCPU"}, {"name": "VCPURequest",},{"name": "VMem"}, {"name": "VMemRequest"}]}
-     answer, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+uuid, data=json.dumps(data), cookie=case_data["cookie"])
-     res = {}
-     for entry in answer[0]["statistics"]:
+    data = {"statistics":[{"name": "VCPU"}, {"name": "VCPURequest",},{"name": "VMem"}, {"name": "VMemRequest"}]}
+    answer, _ = handle_request("POST", case_data["url"]+"api/v3/stats/"+uuid, data=json.dumps(data), cookie=case_data["cookie"])
+    res = {}
+    for entry in answer[0]["statistics"]:
         value = entry["values"]["avg"]
         if "Mem" in entry["name"]:
             value = value / 1024
@@ -19,31 +19,31 @@ def handle_container_actions(uuid):
         if name.find("Request") == -1:
             name += "Limit"
         res[name] = value
-        action_list = get_generic_list(case_data, "api/v3/entities/"+uuid+"/actions", get_list_fragment_for_actions, {"Uuid": uuid})
-        action_count = 0
-        for entry in action_list:
-            if entry["actionType"] == "RESIZE":
-                if entry.get("compoundActions", "") == "":
-                    continue
-                for action in entry["compoundActions"]:
-                    action_count += 1
-                    value = float(action["newValue"]) - float(action["currentValue"]) 
-                    action_type = ""
-                    if "VMem" in action["details"]:
-                        action_type = "VMem"
-                        value = value / 1024
-                    else:
-                        action_type = "VCPU"
-                    if "Request" in action["details"]:
-                        action_type += "Request"
-                    else:
-                        action_type += "Limit"
-                    if res.get("Action_"+action_type, "") == "":
-                        res["Action_"+action_type] = value
-                    else:
-                        res["Action_"+action_type] += value
+    action_list = get_generic_list(case_data, "api/v3/entities/"+uuid+"/actions", get_list_fragment_for_actions, {"Uuid": uuid})
+    action_count = 0
+    for entry in action_list:
+        if entry["actionType"] == "RESIZE":
+            if entry.get("compoundActions", "") == "":
+                continue
+            for action in entry["compoundActions"]:
+                action_count += 1
+                value = float(action["newValue"]) - float(action["currentValue"]) 
+                action_type = ""
+                if "VMem" in action["details"]:
+                    action_type = "VMem"
+                    value = value / 1024
+                else:
+                    action_type = "VCPU"
+                if "Request" in action["details"]:
+                    action_type += "Request"
+                else:
+                    action_type += "Limit"
+                if res.get("Action_"+action_type, "") == "":
+                    res["Action_"+action_type] = value
+                else:
+                    res["Action_"+action_type] += value
         res["ActionCount"] = action_count
-     return res
+    return res
 def get_data(case_data, entity_type,uuid):
     start_time = get_timestamp(24)
     # This function should handle the entity_type specific stuff like which parameters to gather etc. 
